@@ -58,15 +58,28 @@ while True:
     dealer_hand.append(custom_deck[0])
     custom_deck.pop(0)
 
-    print("Dealer hand: ")
-    print(f"[?, {', '.join(map(str, dealer_hand[1:]))}]")
+    if sum(player_hand) > 21:
+                if 11 in player_hand:
+                    player_hand[player_hand.index(11)] = 1
+
+                    print("Dealer hand: ")
+                    print(f"[?, {', '.join(map(str, dealer_hand[1:]))}]")
+
+                    print("\n")
+                    print("\n")
+
+                    print("Player hand: ")
+                    print(player_hand)
+    else:
+        print("Dealer hand: ")
+        print(f"[?, {', '.join(map(str, dealer_hand[1:]))}]")
 
 
-    print("\n")
-    print("\n")
+        print("\n")
+        print("\n")
 
-    print("Player hand: ")
-    print(player_hand)
+        print("Player hand: ")
+        print(player_hand)
 
     # This bool is checked whether the player continues hittinging or not
     player_turn = True
@@ -115,6 +128,9 @@ while True:
                 print(player_hand)
 
         elif player_move.lower() == 's':
+            if sum(dealer_hand) > 21: # This can only happen when dealer gets two aces at start.
+                 dealer_hand[dealer_hand.index(11)] = 1
+
             print("Dealer hand: ")
             print(dealer_hand)
 
