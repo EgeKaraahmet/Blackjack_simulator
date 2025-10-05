@@ -4,6 +4,7 @@ import pickle
 import tkinter as tk
 from tkinter import simpledialog
 
+
 def change_config():
     """Function to change the game configuration, and then store these in config.json and data.txt."""
     print("Changing configuration...\n")

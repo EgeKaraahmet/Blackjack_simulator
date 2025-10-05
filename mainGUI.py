@@ -3,6 +3,8 @@ import pickle
 import random
 import tkinter as tk
 from utility_funcs import change_config, from_visual_to_logic
+from PIL import Image, ImageTk
+import os
 
 class BlackjackGUI:
     def __init__(self, master):
@@ -21,10 +23,17 @@ class BlackjackGUI:
         self.deck = self.data['deck'].copy()
         self.deck_visual = self.data['deck_visual'].copy()
 
+        # Dictionary to store card images
+        self.card_images = {}
+        
+        # Load card back image
+        self.card_back = ImageTk.PhotoImage(Image.open("media/backs/red.png").resize((100, 145)))
+
         # Game state
         self.player_hand = []
         self.dealer_hand = []
         self.player_turn = True
+
 
         # GUI Elements
         self.info_label = tk.Label(master, text="", font=("Arial", 12))
@@ -33,8 +42,18 @@ class BlackjackGUI:
         self.dealer_label = tk.Label(master, text="", font=("Arial", 14))
         self.dealer_label.pack(pady=10)
 
+
+        # Create frames for card images
+        self.dealer_cards_frame = tk.Frame(master)
+        self.dealer_cards_frame.pack(pady=10)
+        
+        self.player_cards_frame = tk.Frame(master)
+        self.player_cards_frame.pack(pady=10)
+
+
         self.player_label = tk.Label(master, text="", font=("Arial", 14))
         self.player_label.pack(pady=10)
+        
 
         self.money_label = tk.Label(master, text="", font=("Arial", 12))
         self.money_label.pack(pady=10)
@@ -45,19 +64,29 @@ class BlackjackGUI:
         self.hit_button = tk.Button(self.button_frame, text="Hit", width=10, command=self.hit)
         self.stay_button = tk.Button(self.button_frame, text="Stay", width=10, command=self.stay)
         self.continue_button = tk.Button(self.button_frame, text="Continue", width=22, command=self.next_round)
+        self.exit_button = tk.Button(self.button_frame, text="Exit", width=10, command=self.exit_game)
+
 
         self.start_game()
 
     def start_game(self):
+        text = "" # Reset message text
         if self.money < self.bet_size:
-            self.info_label.config(text="You don't have enough money to continue playing. Game over.")
+            self.info_label.config(text="You don't have enough money to continue playing. Game over. Broke ass boi.")
             self.hit_button.pack_forget()
             self.stay_button.pack_forget()
             self.continue_button.pack_forget()
+            self.player_label.pack_forget()
+            self.dealer_label.pack_forget()
+            self.player_cards_frame.pack_forget()
+            self.dealer_cards_frame.pack_forget()
+
+            self.money_label.config(text=f"Money: {self.money}")
+            self.exit_button.pack(side=tk.LEFT, padx=10)     
             return
 
         if len(self.deck) < 20:
-            self.info_label.config(text="Low on cards, reshuffling the deck...")
+            text="Low on cards, reshuffling the deck..."
             self.deck_visual = self.data['deck_visual'].copy()
             random.shuffle(self.deck_visual)
 
@@ -81,19 +110,55 @@ class BlackjackGUI:
             self.player_hand[self.player_hand.index(11)] = 1  # Convert Ace from 11 to 1
 
 
-        self.update_display()
+        self.update_display(message=text)
         self.show_action_buttons()
 
     def update_display(self, reveal_dealer=False, message=""):
-        if reveal_dealer:
-            dealer_text = f"Dealer hand: {self.dealer_hand_visual} (Total: {sum(self.dealer_hand)})"
-        else:
-            dealer_text = f"Dealer hand: [?, {', '.join(map(str, self.dealer_hand_visual[1:]))}]"
+        # Clear previous cards
+        for widget in self.dealer_cards_frame.winfo_children():
+            widget.destroy()
+        for widget in self.player_cards_frame.winfo_children():
+            widget.destroy()
 
-        player_text = f"Player hand: {self.player_hand_visual} (Total: {sum(self.player_hand)})"
+        if reveal_dealer:
+            dealer_text = f"Dealer hand (Total: {sum(self.dealer_hand)})"
+            for card in self.dealer_hand_visual:
+                card_str = f"{card[0]}{card[1]}"
+                if card_str not in self.card_images:
+                    img = Image.open(f"media/fronts/{card_str}.png").resize((100, 145))
+                    self.card_images[card_str] = ImageTk.PhotoImage(img)
+                label = tk.Label(self.dealer_cards_frame, image=self.card_images[card_str])
+                label.pack(side=tk.LEFT, padx=2)
+        else:
+            dealer_text = f"Dealer hand (Total: ?)"
+
+             # Show card back for dealer's first card
+            label = tk.Label(self.dealer_cards_frame, image=self.card_back)
+            label.pack(side=tk.LEFT, padx=2)
+            
+            # Show remaining dealer cards
+            for card in self.dealer_hand_visual[1:]:
+                card_str = f"{card[0]}{card[1]}"
+                if card_str not in self.card_images:
+                    img = Image.open(f"media/fronts/{card_str}.png").resize((100, 145))
+                    self.card_images[card_str] = ImageTk.PhotoImage(img)
+                label = tk.Label(self.dealer_cards_frame, image=self.card_images[card_str])
+                label.pack(side=tk.LEFT, padx=2)
+
+        player_text = f"Player hand (Total: {sum(self.player_hand)})"
+
+         # Display player cards
+        for card in self.player_hand_visual:
+            card_str = f"{card[0]}{card[1]}"
+            if card_str not in self.card_images:
+                img = Image.open(f"media/fronts/{card_str}.png").resize((100, 145))
+                self.card_images[card_str] = ImageTk.PhotoImage(img)
+            label = tk.Label(self.player_cards_frame, image=self.card_images[card_str])
+            label.pack(side=tk.LEFT, padx=2)
+
         self.dealer_label.config(text=dealer_text)
         self.player_label.config(text=player_text)
-        self.money_label.config(text=f"Money: {self.money}")
+        self.money_label.config(text=f"Money: {self.money}, Bet Size: {self.bet_size}")
         self.info_label.config(text=message)
 
     def show_action_buttons(self):
@@ -107,6 +172,10 @@ class BlackjackGUI:
 
     def show_continue_button(self):
         self.continue_button.pack(side=tk.LEFT, padx=10)
+        self.exit_button.pack(side=tk.LEFT, padx=10)
+
+    def exit_game(self):
+        self.master.destroy()  # This will close the window and end the program
 
     def hit(self):
         self.player_hand.append(self.deck.pop(0))
@@ -165,6 +234,7 @@ class BlackjackGUI:
         self.hide_action_buttons()
         self.show_continue_button()
         self.continue_button.pack_forget()
+        self.exit_button.pack_forget()
         self.start_game()
 
 if __name__ == "__main__":
