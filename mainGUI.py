@@ -73,9 +73,9 @@ class BlackjackGUI:
         text = "" # Reset message text
         if self.money < self.bet_size:
             self.info_label.config(text="You don't have enough money to continue playing. Game over. Broke ass boi.")
-            self.hit_button.pack_forget()
-            self.stay_button.pack_forget()
-            self.continue_button.pack_forget()
+            self.hide_action_buttons()
+            self.hide_continue_buttons()
+            
             self.player_label.pack_forget()
             self.dealer_label.pack_forget()
             self.player_cards_frame.pack_forget()
@@ -112,6 +112,7 @@ class BlackjackGUI:
 
         self.update_display(message=text)
         self.show_action_buttons()
+        self.hide_continue_buttons()
 
     def update_display(self, reveal_dealer=False, message=""):
         # Clear previous cards
@@ -162,7 +163,6 @@ class BlackjackGUI:
         self.info_label.config(text=message)
 
     def show_action_buttons(self):
-        self.continue_button.pack_forget()
         self.hit_button.pack(side=tk.LEFT, padx=10)
         self.stay_button.pack(side=tk.LEFT, padx=10)
 
@@ -173,6 +173,10 @@ class BlackjackGUI:
     def show_continue_button(self):
         self.continue_button.pack(side=tk.LEFT, padx=10)
         self.exit_button.pack(side=tk.LEFT, padx=10)
+
+    def hide_continue_buttons(self):
+        self.continue_button.pack_forget()
+        self.exit_button.pack_forget()
 
     def exit_game(self):
         self.master.destroy()  # This will close the window and end the program
@@ -231,10 +235,6 @@ class BlackjackGUI:
         self.show_continue_button()
 
     def next_round(self):
-        self.hide_action_buttons()
-        self.show_continue_button()
-        self.continue_button.pack_forget()
-        self.exit_button.pack_forget()
         self.start_game()
 
 if __name__ == "__main__":
