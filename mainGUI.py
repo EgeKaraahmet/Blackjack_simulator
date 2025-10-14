@@ -4,6 +4,18 @@ import random
 import tkinter as tk
 from PIL import Image, ImageTk
 
+
+# TODO ADD SPLIT, variable bet size
+# SPLIT two player hands one dealer hand, play one player hand first.
+
+# Variable bet size, add chip images that are clickable and changable
+# Change backgroung scene to blackjack table
+
+# Add preset configs and custom configs in configuration window.
+
+
+
+
 class BlackjackGame:
     def __init__(self, master):
         self.master = master
@@ -411,7 +423,28 @@ class BlackjackGame:
             self.help_visible = True
   
     def exit_game(self):
-        self.master.destroy()  # This will close the window and end the program
+        # Clear game window
+        for widget in self.game_frame.winfo_children():
+            widget.destroy()
+        self.game_frame.pack_forget()
+        
+        if self.help_visible:
+            self.help_frame.pack_forget()
+        
+        # Reset window size
+        self.master.geometry("400x300")
+        
+        # Show main menu again
+        self.menu_frame.pack(expand=True)
+        
+        # # Reset menu buttons
+        # self.start_button = tk.Button(self.menu_frame, text="Start Game", width=20, 
+        #                             command=self.initialize_game_window, font=("Arial", 14))
+        # self.start_button.pack(pady=20)
+
+        # self.config_button = tk.Button(self.menu_frame, text="Change Configuration", 
+        #                             width=20, command=self.show_config_dialog, font=("Arial", 14))
+        # self.config_button.pack(pady=20)
 
     def hit(self):
         self.is_drawn = True # Flag to indicate player has drawn a card this turn

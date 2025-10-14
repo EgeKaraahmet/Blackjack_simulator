@@ -1,1 +1,1 @@
-{"deck_size": 520, "is_balanced": true, "starting_bankroll": 2500, "bet_size": 150, "is_surrender": true, "is_double_down": true, "house_stand": 17}
+{"deck_size": 104, "is_balanced": false, "starting_bankroll": 200, "bet_size": 5, "is_surrender": true, "is_double_down": true, "house_stand": 17}
