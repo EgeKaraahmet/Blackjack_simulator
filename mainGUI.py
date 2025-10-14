@@ -4,7 +4,7 @@ import random
 import tkinter as tk
 from PIL import Image, ImageTk
 
-class BlackjackGUI:
+class BlackjackGame:
     def __init__(self, master):
         self.master = master
         self.master.title("Blackjack Simulator")
@@ -24,11 +24,10 @@ class BlackjackGUI:
 
         # Initialize game components as None
         self.game_frame = None
-        self.strategy_frame = None
-        self.strategy_photo = None
+        self.help_frame = None
+        self.help_photo = None
         self.card_images = {}
         self.card_back = None
-
 
     def initialize_game_window(self):
         # Hide menu frame
@@ -38,18 +37,27 @@ class BlackjackGUI:
         self.master.geometry("600x800")
 
         # Initialize game components
-        self.strategy_visible = False
+        self.help_visible = False
         
-        # Main game frame and strategy chart frame
+        # Main game frame and help chart frame
         self.game_frame = tk.Frame(self.master)
         self.game_frame.pack(side=tk.LEFT, padx=80)
 
-        self.strategy_frame = tk.Frame(self.master)
+        self.help_frame = tk.Frame(self.master)
 
-        # Load Strategy image
-        strategy_img = Image.open("media/strategy/BJA_Basic_Strategy.jpg")
-        strategy_img = strategy_img.resize((400, 600))
-        self.strategy_photo = ImageTk.PhotoImage(strategy_img)
+        # Load help image
+        help_img = Image.open("media/strategy/BJA_Basic_Strategy.jpg")
+        help_img = help_img.resize((400, 600))
+        self.help_photo = ImageTk.PhotoImage(help_img)
+
+        # Help running count
+        self.count_label = None
+
+        # Remaining deck count
+        self.deck_label = None
+
+        # Optimal policy label
+        self.policy_label = None
 
         # Load config and deck
         with open("config.json", "r") as f:
@@ -61,6 +69,10 @@ class BlackjackGUI:
         self.bet_size = self.config['bet_size']
         self.deck = self.data['deck'].copy()
         self.deck_visual = self.data['deck_visual'].copy()
+
+        # Two running counts are used. One is used mid-round.
+        self.running_count_old = 0
+        self.running_count = 0
 
         self.create_gui_elements()
 
@@ -110,15 +122,15 @@ class BlackjackGUI:
         self.continue_button = tk.Button(self.button_frame, text="Continue", width=22, command=self.next_round)
         self.exit_button = tk.Button(self.button_frame, text="Exit", width=10, command=self.exit_game)
 
-        # Add strategy button in a separate frame
-        self.strategy_button_frame = tk.Frame(self.game_frame)
-        self.strategy_button_frame.pack(pady=10)
+        # Add help button in a separate frame
+        self.help_button_frame = tk.Frame(self.game_frame)
+        self.help_button_frame.pack(pady=10)
         
-        self.strategy_button = tk.Button(self.strategy_button_frame, 
-                                       text="Show Strategy", 
+        self.help_button = tk.Button(self.help_button_frame, 
+                                       text="Toggle Help", 
                                        width=15, 
-                                       command=self.toggle_strategy)
-        self.strategy_button.pack()
+                                       command=self.toggle_help)
+        self.help_button.pack()
         
     def start_game(self):
         text = "" # Reset message text
@@ -143,11 +155,15 @@ class BlackjackGUI:
 
             self.deck = self.from_visual_to_logic(self.deck_visual)
 
+            self.running_count = 0 # Reset running count on reshuffle
+            self.running_count_old = 0
+
         self.player_hand = []
         self.dealer_hand = []
         self.player_hand_visual = []
         self.dealer_hand_visual = []
         self.player_turn = True
+        self.is_drawn = False
 
         # Deal initial cards
         for _ in range(2):
@@ -207,6 +223,37 @@ class BlackjackGUI:
                 self.card_images[card_str] = ImageTk.PhotoImage(img)
             label = tk.Label(self.player_cards_frame, image=self.card_images[card_str])
             label.pack(side=tk.LEFT, padx=2)
+
+        # Running count logic
+        self.running_count = self.running_count_old # Start with prev round running count
+        # Count dealer's visible cards
+        if reveal_dealer:
+            # Count all dealer cards if revealed
+            for card in self.dealer_hand:
+                if card <= 6:
+                    self.running_count += 1
+                elif card >= 10:
+                    self.running_count -= 1
+        else:
+            # Count only the visible dealer card
+            visible_card = self.dealer_hand[1]  # Second card is visible
+            if visible_card <= 6:
+                self.running_count += 1
+            elif visible_card >= 10:
+                self.running_count -= 1
+
+        # Count player's cards
+        for card in self.player_hand:
+            if card <= 6:
+                self.running_count += 1
+            elif card >= 10:
+                self.running_count -= 1
+
+        # Update count labels if it exists
+        if self.help_visible and self.count_label:
+            self.count_label.config(text=f"Running Count: {self.running_count}")
+            self.deck_label.config(text=f"Remaining Decks: {len(self.deck) / 52:.2f}")
+            self.policy_label.config(text=f"Optimal Move: {self.find_optimal_move()}")
 
         self.dealer_label.config(text=dealer_text)
         self.player_label.config(text=player_text)
@@ -301,12 +348,12 @@ class BlackjackGUI:
         self.hit_button.pack(side=tk.LEFT, padx=10)
         self.stand_button.pack(side=tk.LEFT, padx=10)
 
-        # Only show surrender button if allowed in config
-        if self.config['is_surrender']:
+        # Only show surrender button if allowed in config AND if the player has not already drawn a card this turn
+        if self.config['is_surrender'] and (self.is_drawn == False):
             self.surrender_button.pack(side=tk.LEFT, padx=10)
 
         # Only show double down if player has enough money AND if allowed in config
-        if (self.money >= 2 * self.bet_size) and (self.config['is_double_down']):
+        if (self.money >= 2 * self.bet_size) and (self.config['is_double_down']) and (self.is_drawn == False):
             self.double_down_button.pack(side=tk.LEFT, padx=10)
 
     def hide_action_buttons(self):
@@ -323,24 +370,52 @@ class BlackjackGUI:
         self.continue_button.pack_forget()
         self.exit_button.pack_forget()
 
-    def toggle_strategy(self):
-        if self.strategy_visible:
-            self.strategy_frame.pack_forget()
+    def toggle_help(self):
+        if self.help_visible:
+            self.help_frame.pack_forget()
+
             self.master.geometry("600x800")
-            self.strategy_button.config(text="Show Strategy")
-            self.strategy_visible = False
+            self.help_button.config(text="Show help")
+            self.help_visible = False
         else:
-            self.strategy_frame.pack(side=tk.RIGHT, padx=10)
-            strategy_label = tk.Label(self.strategy_frame, image=self.strategy_photo)
-            strategy_label.pack()
+            # Clear any existing widgets in help_frame
+            for widget in self.help_frame.winfo_children():
+                widget.destroy()
+
+            # Add running count label
+            self.count_label = tk.Label(self.help_frame, 
+                                      text=f"Running Count: {self.running_count}", 
+                                      font=("Arial", 14, "bold"))
+            self.count_label.pack(pady=10)
+
+            # Add deck remaining count label
+            self.deck_label = tk.Label(self.help_frame, 
+                                      text=f"Remaining Decks: {len(self.deck) / 52:.2f}", 
+                                      font=("Arial", 14, "bold"))
+            
+             # Add optimal policy label
+            self.policy_label = tk.Label(self.help_frame, 
+                                      text=f"Optimal Move: {self.find_optimal_move()}", 
+                                      font=("Arial", 14, "bold"))
+            
+            self.count_label.pack(pady=10)
+            self.deck_label.pack(pady=10)
+            self.policy_label.pack(pady=10)
+
+            self.help_frame.pack(side=tk.RIGHT, padx=10)
+            help_label = tk.Label(self.help_frame, image=self.help_photo)
+            help_label.pack()
+
             self.master.geometry("1000x800")
-            self.strategy_button.config(text="Hide Strategy")
-            self.strategy_visible = True
-     
+            self.help_button.config(text="Hide Help")
+            self.help_visible = True
+  
     def exit_game(self):
         self.master.destroy()  # This will close the window and end the program
 
     def hit(self):
+        self.is_drawn = True # Flag to indicate player has drawn a card this turn
+
         self.player_hand.append(self.deck.pop(0))
         self.player_hand_visual.append(self.deck_visual.pop(0))
 
@@ -353,6 +428,10 @@ class BlackjackGUI:
             self.hide_action_buttons()
             self.show_continue_button()
         else:
+            # Hide and then show action buttons to refresh them, as now double down and surrender shouldnt be possible.
+            self.hide_action_buttons()
+            self.show_action_buttons()
+
             self.update_display()
 
     def stand(self):
@@ -404,6 +483,44 @@ class BlackjackGUI:
 
         self.resolve_round()
 
+    def find_optimal_move(self):
+
+        # look at player and dealer hands, and return optimal move.
+        dealer_upcard = self.dealer_hand[1]
+
+        player_cards_total = sum(self.player_hand)
+        if 11 in self.player_hand:
+            is_soft = True
+        else:
+            is_soft = False
+
+        if (is_soft == False) and (player_cards_total == 16) and (dealer_upcard >= 9) and (self.config['is_surrender']) and (self.is_drawn == False):
+            return "Surrender"
+        elif (is_soft == False) and (player_cards_total == 15) and (dealer_upcard == 10) and (self.config['is_surrender']) and (self.is_drawn == False):
+            return "Surrender"
+        elif (is_soft == False) and (player_cards_total == 11) and (self.config['is_double_down']) and (self.money >= 2 * self.bet_size) and (self.is_drawn == False):
+            return "Double Down"
+        elif (is_soft == False) and (player_cards_total == 10) and (self.config['is_double_down']) and (self.money >= 2 * self.bet_size) and (dealer_upcard <= 9) and (self.is_drawn == False):
+            return "Double Down"
+        elif (is_soft == False) and (player_cards_total == 9) and (self.config['is_double_down']) and (self.money >= 2 * self.bet_size) and (dealer_upcard >= 3) and (dealer_upcard <= 6) and (self.is_drawn == False):
+            return "Double Down"
+        elif (is_soft == False) and (player_cards_total >= 17):
+            return "Stand"
+        elif (is_soft == False) and (player_cards_total >= 13) and (player_cards_total <= 16) and (dealer_upcard >= 2) and (dealer_upcard <= 6):
+            return "Stand"
+        elif (is_soft == False) and (player_cards_total == 12) and (dealer_upcard >= 4) and (dealer_upcard <= 6):
+            return "Stand"
+        elif (is_soft == True) and (player_cards_total == 19) and (dealer_upcard == 6) and (self.config['is_double_down']) and (self.money >= 2 * self.bet_size) and (self.is_drawn == False):
+            return "Double Down"
+        elif (is_soft == True) and (player_cards_total >= 19):
+            return "Stand"
+        elif (is_soft == True) and (player_cards_total == 18) and (dealer_upcard >= 2) and (dealer_upcard <= 6) and (self.config['is_double_down']) and (self.money >= 2 * self.bet_size) and (self.is_drawn == False):
+            return "Double Down"
+        elif (is_soft == True) and (player_cards_total == 18) and (dealer_upcard <= 8):
+            return "Stand"
+        else:
+            return "Hit"
+
     def resolve_round(self):
         player_total = sum(self.player_hand)
         dealer_total = sum(self.dealer_hand)
@@ -425,6 +542,12 @@ class BlackjackGUI:
         self.show_continue_button()
 
     def next_round(self):
+
+        self.running_count_old = self.running_count  # Store current running count for next round
+        # Update count label if it exists
+        if self.help_visible and self.count_label:
+            self.count_label.config(text=f"Running Count: {self.running_count_old}")
+
         self.start_game()
     
     def change_config(self):
@@ -600,5 +723,5 @@ class BlackjackGUI:
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = BlackjackGUI(root)
+    app = BlackjackGame(root)
     root.mainloop()
