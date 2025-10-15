@@ -5,11 +5,8 @@ import tkinter as tk
 from PIL import Image, ImageTk
 
 
-# TODO ADD SPLIT, variable bet size
+# TODO ADD SPLIT
 # SPLIT two player hands one dealer hand, play one player hand first.
-
-# Variable bet size, add chip images that are clickable and changable
-# Change backgroung scene to blackjack table
 
 # Add preset configs and custom configs in configuration window.
 
@@ -20,7 +17,7 @@ class BlackjackGame:
     def __init__(self, master):
         self.master = master
         self.master.title("Blackjack Simulator")
-        self.master.geometry("400x300")
+        self.master.geometry("300x300")
 
         self.menu_frame = tk.Frame(master)
         self.menu_frame.pack(expand=True)
@@ -34,32 +31,50 @@ class BlackjackGame:
                                      width=20, command=self.show_config_dialog, font=("Arial", 14))
         self.config_button.pack(pady=20)
 
+        self.exit_desktop_button = tk.Button(self.menu_frame, text="Exit to Desktop", 
+                                       width=20, command=self.master.destroy, font=("Arial", 14))
+        self.exit_desktop_button.pack(pady=20)
+
         # Initialize game components as None
         self.game_frame = None
         self.help_frame = None
         self.help_photo = None
         self.card_images = {}
         self.card_back = None
+        self.is_drawn = None
+
+        # The game starts as ended. Start_game() runs the game.
+        self.is_round_end = True
 
     def initialize_game_window(self):
         # Hide menu frame
         self.menu_frame.pack_forget()
         
         # Reset window size for game
-        self.master.geometry("600x800")
+        self.master.geometry("1920x1040")
 
         # Initialize game components
         self.help_visible = False
         
         # Main game frame and help chart frame
-        self.game_frame = tk.Frame(self.master)
-        self.game_frame.pack(side=tk.LEFT, padx=80)
+        self.master.grid_rowconfigure(0, weight=1)
+        self.master.grid_columnconfigure(0, weight=2)  # 2/3
+        self.master.grid_columnconfigure(1, weight=1)  # 1/3
 
-        self.help_frame = tk.Frame(self.master)
 
-        # Load help image
+        # Create and configure game frame
+        self.game_frame = tk.Frame(self.master, width=1280, height=1040, bg='darkgreen')  # 2/3 of 1920
+        self.game_frame.grid(row=0, column=0, sticky='nsew')
+        self.game_frame.pack_propagate(False)  # Prevent frame from resizing
+        
+        # Create and configure help frame
+        self.help_frame = tk.Frame(self.master, width=640, height=1040, bg='lightblue')  # 1/3 of 1920
+        self.help_frame.grid(row=0, column=1, sticky='nsew')
+        self.help_frame.grid_propagate(False)  # Prevent frame from resizing
+
+        # Load help image - resize to fit help_frame width
         help_img = Image.open("media/strategy/BJA_Basic_Strategy.jpg")
-        help_img = help_img.resize((400, 600))
+        help_img = help_img.resize((512, 630))
         self.help_photo = ImageTk.PhotoImage(help_img)
 
         # Help running count
@@ -78,7 +93,7 @@ class BlackjackGame:
             self.data = pickle.load(f)
 
         self.money = self.config['starting_bankroll']
-        self.bet_size = self.config['bet_size']
+        self.bet_size = 0
         self.deck = self.data['deck'].copy()
         self.deck_visual = self.data['deck_visual'].copy()
 
@@ -88,7 +103,8 @@ class BlackjackGame:
 
         self.create_gui_elements()
 
-        self.start_game()
+        # self.start_game()
+        self.show_continue_buttons()
 
     def create_gui_elements(self):
         # Load card back image
@@ -97,56 +113,90 @@ class BlackjackGame:
         # Game state
         self.player_hand = []
         self.dealer_hand = []
-        self.player_turn = True
+        self.player_turn = False
 
 
         # GUI Elements
-        self.info_label = tk.Label(self.game_frame, text="", font=("Arial", 12))
-        self.info_label.pack(pady=10)
+        self.info_label = tk.Label(self.game_frame, text="", font=("Arial", 12), bg='darkgreen')
+        self.info_label.pack(anchor='w', pady=10, padx=200)
 
-        self.dealer_label = tk.Label(self.game_frame, text="", font=("Arial", 14))
-        self.dealer_label.pack(pady=10)
+        self.dealer_label = tk.Label(self.game_frame, text="", font=("Arial", 14), bg='lightgreen')
+        self.dealer_label.pack(anchor='w', pady=10, padx=200)
 
 
         # Create frames for card images
-        self.dealer_cards_frame = tk.Frame(self.game_frame)
-        self.dealer_cards_frame.pack(pady=10)
+        self.dealer_cards_frame = tk.Frame(self.game_frame, bg='darkgreen')
+        self.dealer_cards_frame.pack(anchor='w', pady=10, padx=200)
         
-        self.player_cards_frame = tk.Frame(self.game_frame)
-        self.player_cards_frame.pack(pady=10)
+        self.player_cards_frame = tk.Frame(self.game_frame, bg='darkgreen')
+        self.player_cards_frame.pack(anchor='w', pady=10, padx=200)
 
 
-        self.player_label = tk.Label(self.game_frame, text="", font=("Arial", 14))
-        self.player_label.pack(pady=10)
+        self.player_label = tk.Label(self.game_frame, text="", font=("Arial", 14), bg='lightgreen')
+        self.player_label.pack(anchor='w', pady=10, padx=200)
         
 
-        self.money_label = tk.Label(self.game_frame, text="", font=("Arial", 12))
-        self.money_label.pack(pady=10)
+        self.money_label = tk.Label(self.game_frame, text="", font=("Arial", 12), bg='lightgreen')
+        self.money_label.pack(anchor='w', pady=10, padx=200)
 
-        self.button_frame = tk.Frame(self.game_frame)
-        self.button_frame.pack(pady=20)
+        self.button_frame1 = tk.Frame(self.game_frame, bg='darkgreen')
+        self.button_frame1.pack(anchor='w', pady=20, padx=200)
 
-        self.hit_button = tk.Button(self.button_frame, text="Hit", width=10, command=self.hit)
-        self.stand_button = tk.Button(self.button_frame, text="Stand", width=10, command=self.stand)
-        self.surrender_button = tk.Button(self.button_frame, text="Surrender", width=10, command=self.surrender)
-        self.double_down_button = tk.Button(self.button_frame, text="Double Down", width=10, command=self.double_down)
+        self.button_frame2 = tk.Frame(self.game_frame, bg='darkgreen')
+        self.button_frame2.pack(anchor='w', pady=20, padx=200)
 
-        self.continue_button = tk.Button(self.button_frame, text="Continue", width=22, command=self.next_round)
-        self.exit_button = tk.Button(self.button_frame, text="Exit", width=10, command=self.exit_game)
+        self.hit_button = tk.Button(self.button_frame1, text="Hit", width=10, command=self.hit)
+        self.stand_button = tk.Button(self.button_frame1, text="Stand", width=10, command=self.stand)
+        self.surrender_button = tk.Button(self.button_frame2, text="Surrender", width=10, command=self.surrender)
+        self.double_down_button = tk.Button(self.button_frame2, text="Double Down", width=10, command=self.double_down)
+
+        self.continue_button = tk.Button(self.button_frame1, text="Continue", width=14, command=self.next_round)
+        self.exit_button = tk.Button(self.button_frame1, text="Exit", width=6, command=self.exit_game)
 
         # Add help button in a separate frame
-        self.help_button_frame = tk.Frame(self.game_frame)
-        self.help_button_frame.pack(pady=10)
+        self.help_button_frame = tk.Frame(self.game_frame, bg='darkgreen')
+        self.help_button_frame.pack(anchor='w', pady=10, padx=225)
         
         self.help_button = tk.Button(self.help_button_frame, 
                                        text="Toggle Help", 
-                                       width=15, 
+                                       width=20, 
                                        command=self.toggle_help)
-        self.help_button.pack()
+        self.help_button.pack(side=tk.LEFT)
+
+        # Create chip buttons with different values and colors
+        self.chip_values = {
+            1: ('red', '1'),
+            5: ('blue', '5'),
+            25: ('green', '25'),
+            100: ('black', '100')
+        }
+        
+        # Move chips frame inside button_frame1 (next to Hit/Stand)
+        self.chips_frame = tk.Frame(self.help_button_frame, bg='darkgreen')
+
+        # Move bet display frame inside button_frame2 (next to Double/Surrender)
+        self.bet_display_frame = tk.Frame(self.button_frame1, bg='white', width=150, height=100)
+        
+        # Label to show current bet
+        self.bet_display_label = tk.Label(self.bet_display_frame, 
+                                        text="Current Bet: 0",
+                                        bg='white')
+        
+        # Frame to display chip images
+        self.placed_chips_frame = tk.Frame(self.bet_display_frame, bg='white')
+        
+        # Move clear bet button to help_button_frame
+        self.clear_bet_button = tk.Button(self.button_frame2,
+                                        text="Clear Bet",
+                                        command=self.clear_bet)
+        
+        # Initialize bet tracking
+        self.current_bet = 0
+        self.placed_chips = []
         
     def start_game(self):
         text = "" # Reset message text
-        if self.money < self.bet_size:
+        if self.money < 0:
             self.info_label.config(text="You don't have enough money to continue playing. Game over.")
             self.hide_action_buttons()
             self.hide_continue_buttons()
@@ -176,6 +226,7 @@ class BlackjackGame:
         self.dealer_hand_visual = []
         self.player_turn = True
         self.is_drawn = False
+        self.is_round_end = False
 
         # Deal initial cards
         for _ in range(2):
@@ -263,6 +314,51 @@ class BlackjackGame:
 
         # Update count labels if it exists
         if self.help_visible and self.count_label:
+            for widget in self.help_frame.winfo_children():
+                widget.destroy()
+
+            optimal_move_str = self.find_optimal_move()
+            if optimal_move_str == 'Hit':
+                background_color_policy = 'white'
+            elif optimal_move_str == 'Stand':
+                background_color_policy = 'yellow1'
+            elif optimal_move_str == 'Double Down':
+                background_color_policy = 'forestgreen'
+            elif optimal_move_str == 'Surrender':
+                background_color_policy = 'darkgray'
+            else: # split
+                background_color_policy = 'deepskyblue3'
+
+            if self.running_count < -5:
+                background_color_running_count = 'darkgray'
+            elif self.running_count > 10:
+                background_color_running_count = 'lightblue'
+            else:
+                background_color_running_count = 'white'
+            
+            # Add labels at specific rows
+            self.count_label = tk.Label(self.help_frame, 
+                                    text=f"Running Count: {self.running_count}", 
+                                    font=("Arial", 14, "bold"), bg=background_color_running_count)
+            self.count_label.grid(row=0, pady=10, sticky='ew')
+
+            self.deck_label = tk.Label(self.help_frame, 
+                                    text=f"Remaining Decks: {len(self.deck) / 52:.2f}", 
+                                    font=("Arial", 14, "bold"))
+            self.deck_label.grid(row=1, pady=10, sticky='ew')
+            
+            self.policy_label = tk.Label(self.help_frame, 
+                                    text=f"Optimal Move: {self.find_optimal_move()}", 
+                                    font=("Arial", 14, "bold"), bg=background_color_policy)
+            self.policy_label.grid(row=2, pady=10, sticky='ew')
+
+            help_label = tk.Label(self.help_frame, image=self.help_photo)
+            help_label.grid(row=3, pady=10, sticky='nsew')
+
+            self.help_button.config(text="Hide Help")
+            self.help_visible = True
+
+
             self.count_label.config(text=f"Running Count: {self.running_count}")
             self.deck_label.config(text=f"Remaining Decks: {len(self.deck) / 52:.2f}")
             self.policy_label.config(text=f"Optimal Move: {self.find_optimal_move()}")
@@ -276,7 +372,7 @@ class BlackjackGame:
         # Create configuration dialog
         config_window = tk.Toplevel(self.master)
         config_window.title("Configuration")
-        config_window.geometry("400x500")
+        config_window.geometry("500x600")
 
         # Pool size
         tk.Label(config_window, text="Pool size (multiples of std deck):", font=("Arial", 12)).pack(pady=5)
@@ -298,11 +394,6 @@ class BlackjackGame:
         bankroll_entry = tk.Entry(config_window)
         bankroll_entry.pack(pady=5)
 
-        # Bet size
-        tk.Label(config_window, text="Bet size:", font=("Arial", 12)).pack(pady=5)
-        bet_entry = tk.Entry(config_window)
-        bet_entry.pack(pady=5)
-
         # Surrender allowed
         surrender_var = tk.BooleanVar()
         tk.Checkbutton(config_window, text="Allow surrender", variable=surrender_var, 
@@ -313,10 +404,10 @@ class BlackjackGame:
         tk.Checkbutton(config_window, text="Allow double down", variable=double_var, 
                       font=("Arial", 12)).pack(pady=5)
 
-        # House stand
-        tk.Label(config_window, text="House stands on:", font=("Arial", 12)).pack(pady=5)
-        house_entry = tk.Entry(config_window)
-        house_entry.pack(pady=5)
+        # Replace the house stand input with a checkbox
+        soft17_var = tk.BooleanVar()
+        tk.Checkbutton(config_window, text="Dealer stands on soft 17?", 
+                   variable=soft17_var, font=("Arial", 12)).pack(pady=5)
 
         def save_config():
             # Get values from entries
@@ -336,10 +427,9 @@ class BlackjackGame:
                 'deck_size': deck_size,
                 'is_balanced': is_balanced,
                 'starting_bankroll': int(bankroll_entry.get()),
-                'bet_size': int(bet_entry.get()),
                 'is_surrender': surrender_var.get(),
                 'is_double_down': double_var.get(),
-                'house_stand': int(house_entry.get())
+                'stands_soft17': int(soft17_var.get())
             }
 
             data_dict = {'deck': custom_deck, "deck_visual": custom_deck_visual}
@@ -374,51 +464,91 @@ class BlackjackGame:
         self.surrender_button.pack_forget()
         self.double_down_button.pack_forget()
 
-    def show_continue_button(self):
+    def show_continue_buttons(self):
         self.continue_button.pack(side=tk.LEFT, padx=10)
         self.exit_button.pack(side=tk.LEFT, padx=10)
+
+        self.chips_frame.pack(side=tk.LEFT, padx=50)  # Pack to the left with padding
+        # Create chip buttons
+        for value, (color, text) in self.chip_values.items():
+            self.chip_button = tk.Button(self.chips_frame, 
+                                text=text,
+                                bg=color,
+                                fg='white',
+                                width=4,
+                                height=2,
+                                command=lambda v=value: self.add_chip(v))
+            self.chip_button.pack(side=tk.LEFT, padx=5)
+        self.bet_display_frame.pack(side=tk.LEFT, padx=50)  # Pack to the left with padding
+        self.bet_display_frame.pack_propagate(False)
+        self.bet_display_label.pack(pady=5)
+        self.placed_chips_frame.pack(expand=True)
+        self.clear_bet_button.pack(side=tk.RIGHT, padx= 280)  # Pack to the left of help button
 
     def hide_continue_buttons(self):
         self.continue_button.pack_forget()
         self.exit_button.pack_forget()
 
+         # Clear all chip buttons
+        for widget in self.chips_frame.winfo_children():
+            widget.destroy()
+
+        self.bet_display_frame.pack_forget()
+        self.bet_display_label.pack_forget()
+        self.placed_chips_frame.pack_forget()
+        self.clear_bet_button.pack_forget()
+
     def toggle_help(self):
         if self.help_visible:
-            self.help_frame.pack_forget()
-
-            self.master.geometry("600x800")
-            self.help_button.config(text="Show help")
-            self.help_visible = False
-        else:
-            # Clear any existing widgets in help_frame
             for widget in self.help_frame.winfo_children():
                 widget.destroy()
 
-            # Add running count label
+            self.help_button.config(text="Show help")
+            self.help_visible = False
+        else:
+
+            # Clear any existing widgets
+            for widget in self.help_frame.winfo_children():
+                widget.destroy()
+
+            optimal_move_str = self.find_optimal_move()
+            if optimal_move_str == 'Hit':
+                background_color_policy = 'white'
+            elif optimal_move_str == 'Stand':
+                background_color_policy = 'yellow1'
+            elif optimal_move_str == 'Double Down':
+                background_color_policy = 'emeraldgreen'
+            elif optimal_move_str == 'Surrender':
+                background_color_policy = 'darkgray'
+            else: # split
+                background_color_policy = 'deepskyblue3'
+
+            if self.running_count < -5:
+                background_color_running_count = 'darkgray'
+            elif self.running_count > 10:
+                background_color_running_count = 'lightblue'
+            else:
+                background_color_running_count = 'white'
+            
+            # Add labels at specific rows
             self.count_label = tk.Label(self.help_frame, 
-                                      text=f"Running Count: {self.running_count}", 
-                                      font=("Arial", 14, "bold"))
-            self.count_label.pack(pady=10)
+                                    text=f"Running Count: {self.running_count}", 
+                                    font=("Arial", 14, "bold"), bg=background_color_running_count)
+            self.count_label.grid(row=0, pady=10, sticky='ew')
 
-            # Add deck remaining count label
             self.deck_label = tk.Label(self.help_frame, 
-                                      text=f"Remaining Decks: {len(self.deck) / 52:.2f}", 
-                                      font=("Arial", 14, "bold"))
+                                    text=f"Remaining Decks: {len(self.deck) / 52:.2f}", 
+                                    font=("Arial", 14, "bold"))
+            self.deck_label.grid(row=1, pady=10, sticky='ew')
             
-             # Add optimal policy label
             self.policy_label = tk.Label(self.help_frame, 
-                                      text=f"Optimal Move: {self.find_optimal_move()}", 
-                                      font=("Arial", 14, "bold"))
-            
-            self.count_label.pack(pady=10)
-            self.deck_label.pack(pady=10)
-            self.policy_label.pack(pady=10)
+                                    text=f"Optimal Move: {self.find_optimal_move()}", 
+                                    font=("Arial", 14, "bold"), bg=background_color_policy)
+            self.policy_label.grid(row=2, pady=10, sticky='ew')
 
-            self.help_frame.pack(side=tk.RIGHT, padx=10)
             help_label = tk.Label(self.help_frame, image=self.help_photo)
-            help_label.pack()
+            help_label.grid(row=3, pady=10, sticky='nsew')
 
-            self.master.geometry("1000x800")
             self.help_button.config(text="Hide Help")
             self.help_visible = True
   
@@ -426,25 +556,16 @@ class BlackjackGame:
         # Clear game window
         for widget in self.game_frame.winfo_children():
             widget.destroy()
-        self.game_frame.pack_forget()
-        
-        if self.help_visible:
-            self.help_frame.pack_forget()
+        self.game_frame.grid_forget()
+        for widget in self.help_frame.winfo_children():
+            widget.destroy()
+        self.help_frame.grid_forget()
         
         # Reset window size
         self.master.geometry("400x300")
         
         # Show main menu again
         self.menu_frame.pack(expand=True)
-        
-        # # Reset menu buttons
-        # self.start_button = tk.Button(self.menu_frame, text="Start Game", width=20, 
-        #                             command=self.initialize_game_window, font=("Arial", 14))
-        # self.start_button.pack(pady=20)
-
-        # self.config_button = tk.Button(self.menu_frame, text="Change Configuration", 
-        #                             width=20, command=self.show_config_dialog, font=("Arial", 14))
-        # self.config_button.pack(pady=20)
 
     def hit(self):
         self.is_drawn = True # Flag to indicate player has drawn a card this turn
@@ -456,10 +577,13 @@ class BlackjackGame:
             self.player_hand[self.player_hand.index(11)] = 1  # Convert Ace from 11 to 1
 
         if sum(self.player_hand) > 21:
-            self.update_display(reveal_dealer=True, message="Over 21. You lose!")
+            self.is_drawn = False
+            self.player_turn = False
             self.money -= self.bet_size
+            self.is_round_end = True
+            self.update_display(reveal_dealer=True, message="Over 21. You lose!")
             self.hide_action_buttons()
-            self.show_continue_button()
+            self.show_continue_buttons()
         else:
             # Hide and then show action buttons to refresh them, as now double down and surrender shouldnt be possible.
             self.hide_action_buttons()
@@ -476,17 +600,19 @@ class BlackjackGame:
         self.hide_action_buttons()
         loss_amount = self.bet_size / 2
         self.money -= loss_amount
+        self.is_round_end = True
+        self.player_turn = False
         self.update_display(reveal_dealer=True, message=f"You surrendered. Lost {loss_amount}.")
-        self.show_continue_button()
+        self.show_continue_buttons()
 
     def double_down(self):
         """Player doubles the bet, gets one card, and ends turn."""
         self.hide_action_buttons()
         original_bet = self.bet_size
-        # self.money -= self.bet_size  # Deduct additional bet
         self.bet_size *= 2  # Double the bet size
         self.player_hand.append(self.deck.pop(0))
         self.player_hand_visual.append(self.deck_visual.pop(0))
+        self.is_round_end = True
 
         if sum(self.player_hand) > 21 and 11 in self.player_hand:
             self.player_hand[self.player_hand.index(11)] = 1  # Convert Ace from 11 to 1
@@ -496,7 +622,7 @@ class BlackjackGame:
             self.money -= self.bet_size
             self.hide_action_buttons()
             self.bet_size = original_bet  # Reset bet size for next round
-            self.show_continue_button()
+            self.show_continue_buttons()
         else:
             self.update_display()
             self.dealer_play()
@@ -504,15 +630,25 @@ class BlackjackGame:
 
     def dealer_play(self):
         # Dealer's turn
+
+
         if sum(self.dealer_hand) > 21 and 11 in self.dealer_hand: # if both aces are drawn
                 self.dealer_hand[self.dealer_hand.index(11)] = 1
 
+        if self.config['stands_soft17']: # if stands on soft 17, draw cards easy way
 
-        while sum(self.dealer_hand) < self.config['house_stand']:
-            self.dealer_hand.append(self.deck.pop(0))
-            self.dealer_hand_visual.append(self.deck_visual.pop(0))
-            if sum(self.dealer_hand) > 21 and 11 in self.dealer_hand:
-                self.dealer_hand[self.dealer_hand.index(11)] = 1
+            while (sum(self.dealer_hand) < 17):
+                self.dealer_hand.append(self.deck.pop(0))
+                self.dealer_hand_visual.append(self.deck_visual.pop(0))
+                if sum(self.dealer_hand) > 21 and 11 in self.dealer_hand:
+                    self.dealer_hand[self.dealer_hand.index(11)] = 1
+        
+        else: # Still draws if A and 6 present.
+            while (sum(self.dealer_hand) < 17) or (sum(self.dealer_hand) == 17 and 11 in self.dealer_hand):
+                self.dealer_hand.append(self.deck.pop(0))
+                self.dealer_hand_visual.append(self.deck_visual.pop(0))
+                if sum(self.dealer_hand) > 21 and 11 in self.dealer_hand:
+                    self.dealer_hand[self.dealer_hand.index(11)] = 1
 
         self.resolve_round()
 
@@ -526,6 +662,9 @@ class BlackjackGame:
             is_soft = True
         else:
             is_soft = False
+
+        if self.is_round_end: # Round ended, no need for optimal move
+            return ""
 
         if (is_soft == False) and (player_cards_total == 16) and (dealer_upcard >= 9) and (self.config['is_surrender']) and (self.is_drawn == False):
             return "Surrender"
@@ -571,8 +710,10 @@ class BlackjackGame:
         else:
             message = "Push. No one wins."
 
+        self.is_round_end = True
+
         self.update_display(reveal_dealer=True, message=message)
-        self.show_continue_button()
+        self.show_continue_buttons()
 
     def next_round(self):
 
@@ -581,7 +722,10 @@ class BlackjackGame:
         if self.help_visible and self.count_label:
             self.count_label.config(text=f"Running Count: {self.running_count_old}")
 
-        self.start_game()
+        if self.bet_size > 0:
+            self.start_game()
+        else:
+            self.info_label.config(text="Enter a bet!")
     
     def change_config(self):
         """Function to change the game configuration, and then store these in config.json and data.txt."""
@@ -629,7 +773,7 @@ class BlackjackGame:
             bet_size = int(input("Bet size (int): "))
             is_surrender = input("Is surrender allowed? (y/n): ").lower() == 'y'
             is_double_down = input("Is double down allowed? (y/n): ").lower() == 'y'
-            house_stand = int(input("House stands on (int, usually 17): "))
+            stands_soft17 = int(input("House stands on (int, usually 17): "))
         else:
             with open("config.json", "r") as f:
                 config = json.load(f)
@@ -638,12 +782,12 @@ class BlackjackGame:
             bet_size = config['bet_size']
             is_surrender = config['is_surrender']
             is_double_down = config['is_double_down']
-            house_stand = config['house_stand']
+            stands_soft17 = config['stands_soft17']
 
         game_settings_dict = {'deck_size': len(custom_deck), 'is_balanced': is_balanced,
                             'starting_bankroll': starting_bankroll, 'bet_size': bet_size,
                             'is_surrender': is_surrender, 'is_double_down': is_double_down,
-                            'house_stand': house_stand}
+                            'stands_soft17': stands_soft17}
 
         data_dict = {'deck': custom_deck, "deck_visual": custom_deck_visual}
 
@@ -753,6 +897,51 @@ class BlackjackGame:
             else:
                 logic_deck.append(int(rank))
         return logic_deck
+
+    def add_chip(self, value):
+        """Add a chip to the current bet"""
+        if self.is_round_end:  # Only allow betting before the round starts
+            self.current_bet += value
+            self.placed_chips.append(value)
+            self.update_bet_display()
+            self.bet_size = self.current_bet
+
+    def clear_bet(self):
+        """Clear all placed chips"""
+        a = 5
+        b = 4 # for debugging.
+        if self.is_round_end:  # Only allow clearing before the round starts
+            self.current_bet = 0
+            self.placed_chips = []
+            self.update_bet_display()
+            self.bet_size = self.current_bet
+
+    def update_bet_display(self):
+        """Update the bet display with current chips"""
+        # Update bet amount text
+        self.bet_display_label.config(text=f"Current Bet: {self.current_bet}")
+        
+        # Clear existing chip displays
+        for widget in self.placed_chips_frame.winfo_children():
+            widget.destroy()
+        
+        # Show chips in rows of 4
+        row = 0
+        col = 0
+        for chip in self.placed_chips:
+            color, _ = self.chip_values[chip]
+            chip_label = tk.Label(self.placed_chips_frame,
+                                text=str(chip),
+                                bg=color,
+                                fg='white',
+                                width=3,
+                                height=1)
+            chip_label.grid(row=row, column=col, padx=2, pady=2)
+            col += 1
+            if col >= 4:
+                col = 0
+                row += 1
+
 
 if __name__ == "__main__":
     root = tk.Tk()
