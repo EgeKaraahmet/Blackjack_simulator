@@ -7,8 +7,7 @@ from PIL import Image, ImageTk
 
 # TODO ADD SPLIT
 # SPLIT two player hands one dealer hand, play one player hand first.
-
-# Add preset configs and custom configs in configuration window.
+# Fix toggle help button changing location in action_buttons and continue_buttons
 
 
 
@@ -117,33 +116,47 @@ class BlackjackGame:
 
 
         # GUI Elements
-        self.info_label = tk.Label(self.game_frame, text="", font=("Arial", 12), bg='darkgreen')
+        self.info_label = tk.Label(self.game_frame, text="Welcome to BlackJack Simulator!", font=("Arial", 12), bg='darkgreen')
         self.info_label.pack(anchor='w', pady=10, padx=200)
 
-        self.dealer_label = tk.Label(self.game_frame, text="", font=("Arial", 14), bg='lightgreen')
+        self.dealer_label = tk.Label(self.game_frame, text="Dealer", font=("Arial", 14), bg='lightgreen')
         self.dealer_label.pack(anchor='w', pady=10, padx=200)
 
 
         # Create frames for card images
         self.dealer_cards_frame = tk.Frame(self.game_frame, bg='darkgreen')
         self.dealer_cards_frame.pack(anchor='w', pady=10, padx=200)
+
+        # Show 2 card backs for each player at the start of the GUI.
+        label = tk.Label(self.dealer_cards_frame, image=self.card_back)
+        label.pack(side=tk.LEFT, padx=2)
+
+        label2 = tk.Label(self.dealer_cards_frame, image=self.card_back)
+        label2.pack(side=tk.LEFT, padx=2)
         
         self.player_cards_frame = tk.Frame(self.game_frame, bg='darkgreen')
         self.player_cards_frame.pack(anchor='w', pady=10, padx=200)
 
+        label3 = tk.Label(self.player_cards_frame, image=self.card_back)
+        label3.pack(side=tk.LEFT, padx=2)
 
-        self.player_label = tk.Label(self.game_frame, text="", font=("Arial", 14), bg='lightgreen')
+        label4 = tk.Label(self.player_cards_frame, image=self.card_back)
+        label4.pack(side=tk.LEFT, padx=2)
+        
+
+
+        self.player_label = tk.Label(self.game_frame, text="Player", font=("Arial", 14), bg='lightgreen')
         self.player_label.pack(anchor='w', pady=10, padx=200)
         
 
-        self.money_label = tk.Label(self.game_frame, text="", font=("Arial", 12), bg='lightgreen')
+        self.money_label = tk.Label(self.game_frame, text=f"Money: {self.money}", font=("Arial", 12), bg='lightgreen')
         self.money_label.pack(anchor='w', pady=10, padx=200)
 
         self.button_frame1 = tk.Frame(self.game_frame, bg='darkgreen')
-        self.button_frame1.pack(anchor='w', pady=20, padx=200)
+        self.button_frame1.pack(fill=tk.X, pady=20)
 
         self.button_frame2 = tk.Frame(self.game_frame, bg='darkgreen')
-        self.button_frame2.pack(anchor='w', pady=20, padx=200)
+        self.button_frame2.pack(fill=tk.X, pady=20)
 
         self.hit_button = tk.Button(self.button_frame1, text="Hit", width=10, command=self.hit)
         self.stand_button = tk.Button(self.button_frame1, text="Stand", width=10, command=self.stand)
@@ -155,13 +168,13 @@ class BlackjackGame:
 
         # Add help button in a separate frame
         self.help_button_frame = tk.Frame(self.game_frame, bg='darkgreen')
-        self.help_button_frame.pack(anchor='w', pady=10, padx=225)
+        self.help_button_frame.pack(fill=tk.X, pady=10)
         
         self.help_button = tk.Button(self.help_button_frame, 
                                        text="Toggle Help", 
-                                       width=20, 
+                                       width=23, 
                                        command=self.toggle_help)
-        self.help_button.pack(side=tk.LEFT)
+        self.help_button.pack(side=tk.LEFT, padx=(200,0))
 
         # Create chip buttons with different values and colors
         self.chip_values = {
@@ -175,10 +188,11 @@ class BlackjackGame:
         self.chips_frame = tk.Frame(self.help_button_frame, bg='darkgreen')
 
         # Move bet display frame inside button_frame2 (next to Double/Surrender)
-        self.bet_display_frame = tk.Frame(self.button_frame1, bg='white', width=150, height=100)
+        self.bet_display_frame = tk.Frame(self.button_frame1, bg='white', width=185, height=100)
         
         # Label to show current bet
-        self.bet_display_label = tk.Label(self.bet_display_frame, 
+        self.bet_display_label = tk.Label(self.bet_display_frame,
+                                        width=20, 
                                         text="Current Bet: 0",
                                         bg='white')
         
@@ -187,6 +201,7 @@ class BlackjackGame:
         
         # Move clear bet button to help_button_frame
         self.clear_bet_button = tk.Button(self.button_frame2,
+                                        width=25,
                                         text="Clear Bet",
                                         command=self.clear_bet)
         
@@ -326,13 +341,15 @@ class BlackjackGame:
                 background_color_policy = 'forestgreen'
             elif optimal_move_str == 'Surrender':
                 background_color_policy = 'darkgray'
-            else: # split
+            elif optimal_move_str == 'Split':
                 background_color_policy = 'deepskyblue3'
+            else:
+                background_color_policy = 'white'
 
-            if self.running_count < -5:
-                background_color_running_count = 'darkgray'
-            elif self.running_count > 10:
-                background_color_running_count = 'lightblue'
+            if self.running_count / len(self.deck) < -5: # True count
+                background_color_running_count = 'red2'
+            elif self.running_count / len(self.deck) > 10:
+                background_color_running_count = 'green1'
             else:
                 background_color_running_count = 'white'
             
@@ -370,43 +387,121 @@ class BlackjackGame:
 
     def show_config_dialog(self):
         # Create configuration dialog
-        config_window = tk.Toplevel(self.master)
-        config_window.title("Configuration")
-        config_window.geometry("500x600")
+        self.config_window = tk.Toplevel(self.master)
+        self.config_window.title("Configuration")
+        self.config_window.geometry("500x400")
+
+
+        # Main config presets and custom config presets
+        self.config_preset_button = tk.Button(self.config_window, text="Config Caesars Palace", width=20, 
+                                    command=lambda: self.preset_configs(1), font=("Arial", 14))
+        self.config_preset_button.pack(pady=20)
+
+        self.config_preset_button2 = tk.Button(self.config_window, text="Config Kaya Plazzo", width=20, 
+                                    command=lambda: self.preset_configs(2), font=("Arial", 14))
+        self.config_preset_button2.pack(pady=20)
+
+        self.config_preset_button3 = tk.Button(self.config_window, text="Config Monte Carlo", width=20, 
+                                    command=lambda: self.preset_configs(3), font=("Arial", 14))
+        self.config_preset_button3.pack(pady=20)
+
+        self.config_custom_button = tk.Button(self.config_window, text="Custom Config", width=20, 
+                                    command=self.show_custom_config_dialog, font=("Arial", 14))
+        self.config_custom_button.pack(pady=20)
+
+    def preset_configs(self, num):
+        ''' Preset configs that save when clicked in the config dialog'''
+        if num == 1:
+            deck_size = 104
+            is_balanced = True
+            pool_multiple = 4 # pool size
+            bankroll_entry = 1000
+            surrender_var = True
+            double_var = True
+            soft17_var = False
+        elif num == 2:
+            deck_size = 104
+            is_balanced = False
+            pool_multiple = 4 # pool size
+            bankroll_entry = 2000
+            surrender_var = True
+            double_var = True
+            soft17_var = True
+        elif num == 3:
+            deck_size = 208
+            is_balanced = True
+            pool_multiple = 8 # pool size
+            bankroll_entry = 5000
+            surrender_var = True
+            double_var = True
+            soft17_var = False
+
+        # Create deck
+        suits = ['♠', '♣', '♥', '♦']
+        ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
+        standard_deck_visual = [(rank, suit) for suit in suits for rank in ranks]
+        pool_visual = pool_multiple * standard_deck_visual
+        custom_deck, custom_deck_visual = self.build_deck(pool_visual, deck_size, is_balanced)
+
+        # Save configuration
+        game_settings_dict = {
+            'deck_size': deck_size,
+            'is_balanced': is_balanced,
+            'starting_bankroll': int(bankroll_entry),
+            'is_surrender': surrender_var,
+            'is_double_down': double_var,
+            'stands_soft17': int(soft17_var)
+        }
+
+        data_dict = {'deck': custom_deck, "deck_visual": custom_deck_visual}
+
+        with open("config.json", "w") as f:
+            json.dump(game_settings_dict, f)
+
+        with open("data.txt", "wb") as f:
+            pickle.dump(data_dict, f)
+
+        self.config_window.destroy()
+
+    def show_custom_config_dialog(self):
+        # Create configuration dialog
+        custom_config_window = tk.Toplevel(self.master)
+        custom_config_window.title("Configuration")
+        custom_config_window.geometry("500x600")
 
         # Pool size
-        tk.Label(config_window, text="Pool size (multiples of std deck):", font=("Arial", 12)).pack(pady=5)
-        pool_entry = tk.Entry(config_window)
+        tk.Label(custom_config_window, text="Pool size (multiples of std deck):", font=("Arial", 12)).pack(pady=5)
+        pool_entry = tk.Entry(custom_config_window)
         pool_entry.pack(pady=5)
 
         # Deck size
-        tk.Label(config_window, text="Deck size:", font=("Arial", 12)).pack(pady=5)
-        deck_entry = tk.Entry(config_window)
+        tk.Label(custom_config_window, text="Deck size:", font=("Arial", 12)).pack(pady=5)
+        deck_entry = tk.Entry(custom_config_window)
         deck_entry.pack(pady=5)
 
         # Balanced deck
         balanced_var = tk.BooleanVar()
-        tk.Checkbutton(config_window, text="Balanced deck", variable=balanced_var, 
+        tk.Checkbutton(custom_config_window, text="Balanced deck", variable=balanced_var, 
                       font=("Arial", 12)).pack(pady=5)
 
         # Starting bankroll
-        tk.Label(config_window, text="Starting bankroll:", font=("Arial", 12)).pack(pady=5)
-        bankroll_entry = tk.Entry(config_window)
+        tk.Label(custom_config_window, text="Starting bankroll:", font=("Arial", 12)).pack(pady=5)
+        bankroll_entry = tk.Entry(custom_config_window)
         bankroll_entry.pack(pady=5)
 
         # Surrender allowed
         surrender_var = tk.BooleanVar()
-        tk.Checkbutton(config_window, text="Allow surrender", variable=surrender_var, 
+        tk.Checkbutton(custom_config_window, text="Allow surrender", variable=surrender_var, 
                       font=("Arial", 12)).pack(pady=5)
 
         # Double down allowed
         double_var = tk.BooleanVar()
-        tk.Checkbutton(config_window, text="Allow double down", variable=double_var, 
+        tk.Checkbutton(custom_config_window, text="Allow double down", variable=double_var, 
                       font=("Arial", 12)).pack(pady=5)
 
         # Replace the house stand input with a checkbox
         soft17_var = tk.BooleanVar()
-        tk.Checkbutton(config_window, text="Dealer stands on soft 17?", 
+        tk.Checkbutton(custom_config_window, text="Dealer stands on soft 17?", 
                    variable=soft17_var, font=("Arial", 12)).pack(pady=5)
 
         def save_config():
@@ -440,23 +535,25 @@ class BlackjackGame:
             with open("data.txt", "wb") as f:
                 pickle.dump(data_dict, f)
 
-            config_window.destroy()
+            custom_config_window.destroy()
+            self.config_window.destroy()
 
         # Save button
-        tk.Button(config_window, text="Save", command=save_config, 
+        tk.Button(custom_config_window, text="Save", command=save_config, 
                  font=("Arial", 12)).pack(pady=20)
 
     def show_action_buttons(self):
-        self.hit_button.pack(side=tk.LEFT, padx=10)
-        self.stand_button.pack(side=tk.LEFT, padx=10)
+
+        self.hit_button.pack(side=tk.LEFT, padx=(200,0), pady=(38,0))
+        self.stand_button.pack(side=tk.LEFT, padx=(10,0), pady=(38,0))
 
         # Only show surrender button if allowed in config AND if the player has not already drawn a card this turn
         if self.config['is_surrender'] and (self.is_drawn == False):
-            self.surrender_button.pack(side=tk.LEFT, padx=10)
+            self.surrender_button.pack(side=tk.LEFT, padx=(200,0))
 
         # Only show double down if player has enough money AND if allowed in config
         if (self.money >= 2 * self.bet_size) and (self.config['is_double_down']) and (self.is_drawn == False):
-            self.double_down_button.pack(side=tk.LEFT, padx=10)
+            self.double_down_button.pack(side=tk.LEFT, padx=(10,0))
 
     def hide_action_buttons(self):
         self.hit_button.pack_forget()
@@ -465,10 +562,10 @@ class BlackjackGame:
         self.double_down_button.pack_forget()
 
     def show_continue_buttons(self):
-        self.continue_button.pack(side=tk.LEFT, padx=10)
-        self.exit_button.pack(side=tk.LEFT, padx=10)
+        self.continue_button.pack(side=tk.LEFT, padx=(200,0))
+        self.exit_button.pack(side=tk.LEFT, padx=(10,0))
 
-        self.chips_frame.pack(side=tk.LEFT, padx=50)  # Pack to the left with padding
+        self.chips_frame.pack(side=tk.LEFT, padx=(220,0))  # Pack to the left with padding
         # Create chip buttons
         for value, (color, text) in self.chip_values.items():
             self.chip_button = tk.Button(self.chips_frame, 
@@ -478,12 +575,12 @@ class BlackjackGame:
                                 width=4,
                                 height=2,
                                 command=lambda v=value: self.add_chip(v))
-            self.chip_button.pack(side=tk.LEFT, padx=5)
-        self.bet_display_frame.pack(side=tk.LEFT, padx=50)  # Pack to the left with padding
+            self.chip_button.pack(side=tk.LEFT, padx=(10,0))
+        self.bet_display_frame.pack(side=tk.LEFT, padx=(230,0))  # Pack to the left with padding
         self.bet_display_frame.pack_propagate(False)
         self.bet_display_label.pack(pady=5)
         self.placed_chips_frame.pack(expand=True)
-        self.clear_bet_button.pack(side=tk.RIGHT, padx= 280)  # Pack to the left of help button
+        self.clear_bet_button.pack(side=tk.LEFT, padx=(600,0))  # Pack to the left of help button
 
     def hide_continue_buttons(self):
         self.continue_button.pack_forget()
@@ -520,13 +617,15 @@ class BlackjackGame:
                 background_color_policy = 'emeraldgreen'
             elif optimal_move_str == 'Surrender':
                 background_color_policy = 'darkgray'
-            else: # split
+            elif optimal_move_str == 'Split':
                 background_color_policy = 'deepskyblue3'
+            else:
+                background_color_policy = 'white'
 
-            if self.running_count < -5:
-                background_color_running_count = 'darkgray'
-            elif self.running_count > 10:
-                background_color_running_count = 'lightblue'
+            if self.running_count / len(self.deck) < -5:
+                background_color_running_count = 'red2'
+            elif self.running_count / len(self.deck) > 10:
+                background_color_running_count = 'green1'
             else:
                 background_color_running_count = 'white'
             
@@ -654,6 +753,9 @@ class BlackjackGame:
 
     def find_optimal_move(self):
 
+        if self.player_hand == []: # This only happens when the game just starts.
+            return ""
+
         # look at player and dealer hands, and return optimal move.
         dealer_upcard = self.dealer_hand[1]
 
@@ -726,81 +828,6 @@ class BlackjackGame:
             self.start_game()
         else:
             self.info_label.config(text="Enter a bet!")
-    
-    def change_config(self):
-        """Function to change the game configuration, and then store these in config.json and data.txt."""
-        print("Changing configuration...\n")
-
-        deck_change = input("Make changes to deck? (y/n) ")
-        if deck_change.lower() == 'y':
-
-            suits = ['♠', '♣', '♥', '♦']
-            ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
-
-            standard_deck_visual = [(rank, suit) for suit in suits for rank in ranks]
-
-            pool_multiple = int(input("Pool size (multiples of std deck) (int): "))
-            deck_size = int(input("Deck size (int): "))
-            is_balanced = input("Balanced deck? (y/n): ").lower() == 'y'
-            print("\n")
-
-            pool_visual = pool_multiple * standard_deck_visual
-
-            custom_deck, custom_deck_visual = self.build_deck(pool_visual, deck_size, is_balanced)
-
-            print(f"New deck built with a size of {len(custom_deck)}.")
-            if is_balanced:
-                print("The deck is balanced.")
-            else:
-                print("The deck is not balanced.")
-        else:
-            with open("data.txt", "rb") as f:
-                data = pickle.load(f)
-                f.close()
-            custom_deck = data['deck']
-            custom_deck_visual = data['deck_visual']
-            with open("config.json", "r") as f:
-                config = json.load(f)
-                f.close()
-            deck_size = len(custom_deck)
-            is_balanced = config['is_balanced']
-            
-
-        print("\n")
-        config_change = input("Make changes to other settings? (y/n) ")
-        if config_change.lower() == 'y':
-            starting_bankroll = int(input("Starting bankroll (int): "))
-            bet_size = int(input("Bet size (int): "))
-            is_surrender = input("Is surrender allowed? (y/n): ").lower() == 'y'
-            is_double_down = input("Is double down allowed? (y/n): ").lower() == 'y'
-            stands_soft17 = int(input("House stands on (int, usually 17): "))
-        else:
-            with open("config.json", "r") as f:
-                config = json.load(f)
-                f.close()
-            starting_bankroll = config['starting_bankroll']
-            bet_size = config['bet_size']
-            is_surrender = config['is_surrender']
-            is_double_down = config['is_double_down']
-            stands_soft17 = config['stands_soft17']
-
-        game_settings_dict = {'deck_size': len(custom_deck), 'is_balanced': is_balanced,
-                            'starting_bankroll': starting_bankroll, 'bet_size': bet_size,
-                            'is_surrender': is_surrender, 'is_double_down': is_double_down,
-                            'stands_soft17': stands_soft17}
-
-        data_dict = {'deck': custom_deck, "deck_visual": custom_deck_visual}
-
-        with open("config.json", "w") as f:
-            json.dump(game_settings_dict, f)
-            f.close()
-
-        with open("data.txt", "wb") as f:
-            pickle.dump(data_dict, f)
-            f.close()
-
-        print("\n")
-        print("Changes saved.\n")
 
     def build_deck(self, pool_visual, build_size, is_balanced):
         """Builds a deck of cards based on the chosen cards and balance preference."""
