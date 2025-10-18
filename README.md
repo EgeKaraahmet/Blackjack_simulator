@@ -2,4 +2,3 @@ Welcome to Blackjack Simulator! This app is built as a tool to learn and practic
 
 TODO:
   -Add split player move
-  -Preset configs

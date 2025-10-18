@@ -4,13 +4,11 @@ import random
 import tkinter as tk
 from PIL import Image, ImageTk
 
+# self.player turn can be removed?
 
-# TODO ADD SPLIT
-# SPLIT two player hands one dealer hand, play one player hand first.
-# Fix toggle help button changing location in action_buttons and continue_buttons
+# Hard 17 and soft 17 have different strategies!!! FIX
 
-
-
+# optional music
 
 class BlackjackGame:
     def __init__(self, master):
@@ -93,6 +91,7 @@ class BlackjackGame:
 
         self.money = self.config['starting_bankroll']
         self.bet_size = 0
+        self.min_bet_size = self.config['min_bet_size']
         self.deck = self.data['deck'].copy()
         self.deck_visual = self.data['deck_visual'].copy()
 
@@ -111,8 +110,10 @@ class BlackjackGame:
 
         # Game state
         self.player_hand = []
+        self.player_hand2 = []
         self.dealer_hand = []
         self.player_turn = False
+        self.is_split = False
 
 
         # GUI Elements
@@ -153,15 +154,16 @@ class BlackjackGame:
         self.money_label.pack(anchor='w', pady=10, padx=200)
 
         self.button_frame1 = tk.Frame(self.game_frame, bg='darkgreen')
-        self.button_frame1.pack(fill=tk.X, pady=20)
+        self.button_frame1.pack(fill=tk.X, pady=20, padx=(190,0))
 
         self.button_frame2 = tk.Frame(self.game_frame, bg='darkgreen')
-        self.button_frame2.pack(fill=tk.X, pady=20)
+        self.button_frame2.pack(fill=tk.X, pady=20, padx=(190,0))
 
         self.hit_button = tk.Button(self.button_frame1, text="Hit", width=10, command=self.hit)
         self.stand_button = tk.Button(self.button_frame1, text="Stand", width=10, command=self.stand)
         self.surrender_button = tk.Button(self.button_frame2, text="Surrender", width=10, command=self.surrender)
         self.double_down_button = tk.Button(self.button_frame2, text="Double Down", width=10, command=self.double_down)
+        self.split_button = tk.Button(self.button_frame2, text="Split", width=10, command=self.split)
 
         self.continue_button = tk.Button(self.button_frame1, text="Continue", width=14, command=self.next_round)
         self.exit_button = tk.Button(self.button_frame1, text="Exit", width=6, command=self.exit_game)
@@ -236,12 +238,16 @@ class BlackjackGame:
             self.running_count_old = 0
 
         self.player_hand = []
+        self.player_hand2 = []
         self.dealer_hand = []
         self.player_hand_visual = []
+        self.player_hand_visual2 = []
         self.dealer_hand_visual = []
         self.player_turn = True
         self.is_drawn = False
         self.is_round_end = False
+        self.is_split = False
+        self.hand_num = 1
 
         # Deal initial cards
         for _ in range(2):
@@ -290,11 +296,20 @@ class BlackjackGame:
                     self.card_images[card_str] = ImageTk.PhotoImage(img)
                 label = tk.Label(self.dealer_cards_frame, image=self.card_images[card_str])
                 label.pack(side=tk.LEFT, padx=2)
+        
+        # Which player hand are we talking about?
+        if self.is_split and self.hand_num == 2:
+            hand = self.player_hand2
+            hand_visual = self.player_hand_visual2
+        else:
+            hand = self.player_hand
+            hand_visual = self.player_hand_visual
 
-        player_text = f"Player hand (Total: {sum(self.player_hand)})"
+
+        player_text = f"Player hand (Total: {sum(hand)})"
 
          # Display player cards
-        for card in self.player_hand_visual:
+        for card in hand_visual:
             card_str = f"{card[0]}{card[1]}"
             if card_str not in self.card_images:
                 img = Image.open(f"media/fronts/{card_str}.png").resize((100, 145))
@@ -321,7 +336,7 @@ class BlackjackGame:
                 self.running_count -= 1
 
         # Count player's cards
-        for card in self.player_hand:
+        for card in hand:
             if card <= 6:
                 self.running_count += 1
             elif card >= 10:
@@ -365,7 +380,7 @@ class BlackjackGame:
             self.deck_label.grid(row=1, pady=10, sticky='ew')
             
             self.policy_label = tk.Label(self.help_frame, 
-                                    text=f"Optimal Move: {self.find_optimal_move()}", 
+                                    text=f"Optimal Move: {optimal_move_str}", 
                                     font=("Arial", 14, "bold"), bg=background_color_policy)
             self.policy_label.grid(row=2, pady=10, sticky='ew')
 
@@ -418,7 +433,10 @@ class BlackjackGame:
             bankroll_entry = 1000
             surrender_var = True
             double_var = True
+            split_var = True
             soft17_var = False
+            das_var = True
+            minimum_bet_size = 5
         elif num == 2:
             deck_size = 104
             is_balanced = False
@@ -426,7 +444,10 @@ class BlackjackGame:
             bankroll_entry = 2000
             surrender_var = True
             double_var = True
+            split_var = True
             soft17_var = True
+            das_var = True
+            minimum_bet_size = 2
         elif num == 3:
             deck_size = 208
             is_balanced = True
@@ -434,7 +455,10 @@ class BlackjackGame:
             bankroll_entry = 5000
             surrender_var = True
             double_var = True
+            split_var = True
             soft17_var = False
+            das_var = True
+            minimum_bet_size = 10
 
         # Create deck
         suits = ['♠', '♣', '♥', '♦']
@@ -450,7 +474,10 @@ class BlackjackGame:
             'starting_bankroll': int(bankroll_entry),
             'is_surrender': surrender_var,
             'is_double_down': double_var,
-            'stands_soft17': int(soft17_var)
+            'stands_soft17': soft17_var,
+            'is_split': split_var,
+            'is_DAS': das_var,
+            'min_bet_size': minimum_bet_size
         }
 
         data_dict = {'deck': custom_deck, "deck_visual": custom_deck_visual}
@@ -468,6 +495,11 @@ class BlackjackGame:
         custom_config_window = tk.Toplevel(self.master)
         custom_config_window.title("Configuration")
         custom_config_window.geometry("500x600")
+
+        # Bet size
+        tk.Label(custom_config_window, text="Minimum bet size: ", font=("Arial", 12)).pack(pady=5)
+        minimum_bet_size = tk.Entry(custom_config_window)
+        minimum_bet_size.pack(pady=5)
 
         # Pool size
         tk.Label(custom_config_window, text="Pool size (multiples of std deck):", font=("Arial", 12)).pack(pady=5)
@@ -498,6 +530,16 @@ class BlackjackGame:
         double_var = tk.BooleanVar()
         tk.Checkbutton(custom_config_window, text="Allow double down", variable=double_var, 
                       font=("Arial", 12)).pack(pady=5)
+        
+        # Split allowed
+        split_var = tk.BooleanVar()
+        tk.Checkbutton(custom_config_window, text="Allow split", variable=split_var, 
+                      font=("Arial", 12)).pack(pady=5)
+        
+        # Double down after Split (DAS) allowed
+        das_var = tk.BooleanVar()
+        tk.Checkbutton(custom_config_window, text="Allow double after split", variable=das_var, 
+                      font=("Arial", 12)).pack(pady=5)
 
         # Replace the house stand input with a checkbox
         soft17_var = tk.BooleanVar()
@@ -524,7 +566,10 @@ class BlackjackGame:
                 'starting_bankroll': int(bankroll_entry.get()),
                 'is_surrender': surrender_var.get(),
                 'is_double_down': double_var.get(),
-                'stands_soft17': int(soft17_var.get())
+                'stands_soft17': soft17_var.get(),
+                'is_split': split_var.get(),
+                'is_DAS': das_var.get(),
+                'min_bet_size': minimum_bet_size.get()
             }
 
             data_dict = {'deck': custom_deck, "deck_visual": custom_deck_visual}
@@ -544,25 +589,30 @@ class BlackjackGame:
 
     def show_action_buttons(self):
 
-        self.hit_button.pack(side=tk.LEFT, padx=(200,0), pady=(38,0))
+        self.hit_button.pack(side=tk.LEFT, padx=(10,0), pady=(38,0))
         self.stand_button.pack(side=tk.LEFT, padx=(10,0), pady=(38,0))
 
-        # Only show surrender button if allowed in config AND if the player has not already drawn a card this turn
-        if self.config['is_surrender'] and (self.is_drawn == False):
-            self.surrender_button.pack(side=tk.LEFT, padx=(200,0))
+        # Only show surrender button if allowed in config AND if the player has not already drawn a card, or split.
+        if self.config['is_surrender'] and (not self.is_drawn) and (not self.is_split):
+            self.surrender_button.pack(side=tk.LEFT, padx=(10,0))
 
         # Only show double down if player has enough money AND if allowed in config
-        if (self.money >= 2 * self.bet_size) and (self.config['is_double_down']) and (self.is_drawn == False):
+        if (self.money >= 2 * self.bet_size) and (self.config['is_double_down']) and (self.is_drawn == False) and (not self.is_split or self.config['is_DAS']):
             self.double_down_button.pack(side=tk.LEFT, padx=(10,0))
+
+        # Show split if card is not drawn, not already split before, and have same cards.
+        if (self.player_hand[0] == self.player_hand[1]) and (not self.is_drawn) and (not self.is_split):
+            self.split_button.pack(side=tk.LEFT, padx=(10,0))
 
     def hide_action_buttons(self):
         self.hit_button.pack_forget()
         self.stand_button.pack_forget()
         self.surrender_button.pack_forget()
         self.double_down_button.pack_forget()
+        self.split_button.pack_forget()
 
     def show_continue_buttons(self):
-        self.continue_button.pack(side=tk.LEFT, padx=(200,0))
+        self.continue_button.pack(side=tk.LEFT, padx=(10,0))
         self.exit_button.pack(side=tk.LEFT, padx=(10,0))
 
         self.chips_frame.pack(side=tk.LEFT, padx=(220,0))  # Pack to the left with padding
@@ -580,7 +630,7 @@ class BlackjackGame:
         self.bet_display_frame.pack_propagate(False)
         self.bet_display_label.pack(pady=5)
         self.placed_chips_frame.pack(expand=True)
-        self.clear_bet_button.pack(side=tk.LEFT, padx=(600,0))  # Pack to the left of help button
+        self.clear_bet_button.pack(side=tk.LEFT, padx=(410,0))  # Pack to the left of help button
 
     def hide_continue_buttons(self):
         self.continue_button.pack_forget()
@@ -641,7 +691,7 @@ class BlackjackGame:
             self.deck_label.grid(row=1, pady=10, sticky='ew')
             
             self.policy_label = tk.Label(self.help_frame, 
-                                    text=f"Optimal Move: {self.find_optimal_move()}", 
+                                    text=f"Optimal Move: {optimal_move_str}", 
                                     font=("Arial", 14, "bold"), bg=background_color_policy)
             self.policy_label.grid(row=2, pady=10, sticky='ew')
 
@@ -669,30 +719,80 @@ class BlackjackGame:
     def hit(self):
         self.is_drawn = True # Flag to indicate player has drawn a card this turn
 
-        self.player_hand.append(self.deck.pop(0))
-        self.player_hand_visual.append(self.deck_visual.pop(0))
+        if self.is_split:
+            if self.hand_num == 2:
+                self.player_hand2.append(self.deck.pop(0))
+                self.player_hand_visual2.append(self.deck_visual.pop(0))
 
-        if sum(self.player_hand) > 21 and 11 in self.player_hand:
-            self.player_hand[self.player_hand.index(11)] = 1  # Convert Ace from 11 to 1
+                if sum(self.player_hand2) > 21 and 11 in self.player_hand2:
+                    self.player_hand2[self.player_hand2.index(11)] = 1  # Convert Ace from 11 to 1
 
-        if sum(self.player_hand) > 21:
-            self.is_drawn = False
-            self.player_turn = False
-            self.money -= self.bet_size
-            self.is_round_end = True
-            self.update_display(reveal_dealer=True, message="Over 21. You lose!")
-            self.hide_action_buttons()
-            self.show_continue_buttons()
+                if sum(self.player_hand2) > 21:
+                    self.is_drawn = False
+                    self.player_turn = False
+                    self.money -= self.bet_size
+                    self.is_round_end = True
+                    self.update_display(reveal_dealer=True, message="Over 21. You lose!")
+                    self.hide_action_buttons()
+                    self.show_continue_buttons()
+                else:
+                    # Hide and then show action buttons to refresh them, as now double down and surrender shouldnt be possible.
+                    self.hide_action_buttons()
+                    self.show_action_buttons()
+
+                    self.update_display()
+            else:
+                self.player_hand.append(self.deck.pop(0))
+                self.player_hand_visual.append(self.deck_visual.pop(0))
+
+                if sum(self.player_hand) > 21 and 11 in self.player_hand:
+                    self.player_hand[self.player_hand.index(11)] = 1  # Convert Ace from 11 to 1
+
+                if sum(self.player_hand) > 21:
+                    self.is_drawn = False
+                    self.player_turn = True
+
+                    self.hand_num = 2
+                    self.update_display(reveal_dealer=True, message="Hand 1 Bust!")
+                else:
+                    self.update_display()
+
+        # Non-split code.        
         else:
-            # Hide and then show action buttons to refresh them, as now double down and surrender shouldnt be possible.
-            self.hide_action_buttons()
-            self.show_action_buttons()
+            self.player_hand.append(self.deck.pop(0))
+            self.player_hand_visual.append(self.deck_visual.pop(0))
 
-            self.update_display()
+            if sum(self.player_hand) > 21 and 11 in self.player_hand:
+                self.player_hand[self.player_hand.index(11)] = 1  # Convert Ace from 11 to 1
+
+            if sum(self.player_hand) > 21:
+                self.is_drawn = False
+                self.player_turn = False
+                self.money -= self.bet_size
+                self.is_round_end = True
+                self.update_display(reveal_dealer=True, message="Over 21. You lose!")
+                self.hide_action_buttons()
+                self.show_continue_buttons()
+
+            else:
+                # Hide and then show action buttons to refresh them, as now double down and surrender shouldnt be possible.
+                self.hide_action_buttons()
+                self.show_action_buttons()
+
+                self.update_display()
 
     def stand(self):
-        self.hide_action_buttons()
-        self.dealer_play()
+        if self.is_split:
+            if self.hand_num == 1:
+                self.hand_num = 2
+                self.update_display(message= "Hand 2")
+            else:
+                self.resolve_split_hands()
+
+        # Non split hands        
+        else:
+            self.hide_action_buttons()
+            self.dealer_play()
 
     def surrender(self):
         """Player surrenders and loses half the bet."""
@@ -707,25 +807,120 @@ class BlackjackGame:
     def double_down(self):
         """Player doubles the bet, gets one card, and ends turn."""
         self.hide_action_buttons()
-        original_bet = self.bet_size
-        self.bet_size *= 2  # Double the bet size
+
+        if self.is_split:
+            if self.hand_num == 1:
+                self.bet_size *= 2  # Double the bet size
+                self.player_hand.append(self.deck.pop(0))
+                self.player_hand_visual.append(self.deck_visual.pop(0))
+
+                if sum(self.player_hand) > 21 and 11 in self.player_hand:
+                    self.player_hand[self.player_hand.index(11)] = 1  # Convert Ace from 11 to 1
+
+                self.hand_num = 2
+                self.update_display(reveal_dealer=True, message="Hand 2")
+
+            else:
+                self.bet_size2 *= 2  # Double the bet size
+                self.player_hand2.append(self.deck.pop(0))
+                self.player_hand_visual2.append(self.deck_visual.pop(0))
+
+                if sum(self.player_hand2) > 21 and 11 in self.player_hand2:
+                    self.player_hand2[self.player_hand2.index(11)] = 1  # Convert Ace from 11 to 1
+
+                self.resolve_split_hands()
+
+        else:
+            original_bet = self.bet_size
+            self.bet_size *= 2  # Double the bet size
+            self.player_hand.append(self.deck.pop(0))
+            self.player_hand_visual.append(self.deck_visual.pop(0))
+            self.is_round_end = True
+
+            if sum(self.player_hand) > 21 and 11 in self.player_hand:
+                self.player_hand[self.player_hand.index(11)] = 1  # Convert Ace from 11 to 1
+
+            if sum(self.player_hand) > 21:
+                self.update_display(reveal_dealer=True, message="Over 21. You lose!")
+                self.money -= self.bet_size
+                self.hide_action_buttons()
+                self.bet_size = original_bet  # Reset bet size for next round
+                self.show_continue_buttons()
+            else:
+                self.update_display()
+                self.dealer_play()
+                self.bet_size = self.current_bet  # Reset bet size for next round
+
+    def split(self):
+        """Handle splitting of pairs"""
+        self.is_split = True
+        # Create second hand from split
+        self.player_hand2 = [self.player_hand.pop()]
+        self.player_hand_visual2 = [self.player_hand_visual.pop()]
+        
+        # Deal one card to each hand
         self.player_hand.append(self.deck.pop(0))
         self.player_hand_visual.append(self.deck_visual.pop(0))
+        self.player_hand2.append(self.deck.pop(0))
+        self.player_hand_visual2.append(self.deck_visual.pop(0))
+        
+        # Double the bet for second hand
+        self.bet_size2 = self.bet_size
+        
+        # Update display for first hand
+        self.hand_num = 1
+        self.hide_action_buttons()
+        self.show_action_buttons()
+        self.update_display(reveal_dealer=False, message="Hand 1")
+
+    def resolve_split_hands(self):
+        """Resolve both split hands against dealer"""
+        # Dealer plays
+        self.dealer_play()
+        dealer_total = sum(self.dealer_hand)
+
+        # Resolve first hand
+        hand1_total = sum(self.player_hand)
+        if hand1_total > 21:
+            self.money -= self.bet_size
+            message1 = "Hand 1: Bust"
+        elif dealer_total > 21:
+            self.money += self.bet_size
+            message1 = "Hand 1: Win (Dealer bust)"
+        elif hand1_total > dealer_total:
+            self.money += self.bet_size
+            message1 = "Hand 1: Win"
+        elif hand1_total < dealer_total:
+            self.money -= self.bet_size
+            message1 = "Hand 1: Lose"
+        else:
+            message1 = "Hand 1: Push"
+
+        # Resolve second hand
+        hand2_total = sum(self.player_hand2)
+        if hand2_total > 21:
+            self.money -= self.bet_size2
+            message2 = "Hand 2: Bust"
+        elif dealer_total > 21:
+            self.money += self.bet_size2
+            message2 = "Hand 2: Win (Dealer bust)"
+        elif hand2_total > dealer_total:
+            self.money += self.bet_size2
+            message2 = "Hand 2: Win"
+        elif hand2_total < dealer_total:
+            self.money -= self.bet_size2
+            message2 = "Hand 2: Lose"
+        else:
+            message2 = "Hand 2: Push"
+
+        # Show final results
         self.is_round_end = True
 
-        if sum(self.player_hand) > 21 and 11 in self.player_hand:
-            self.player_hand[self.player_hand.index(11)] = 1  # Convert Ace from 11 to 1
-
-        if sum(self.player_hand) > 21:
-            self.update_display(reveal_dealer=True, message="Over 21. You lose!")
-            self.money -= self.bet_size
-            self.hide_action_buttons()
-            self.bet_size = original_bet  # Reset bet size for next round
-            self.show_continue_buttons()
-        else:
-            self.update_display()
-            self.dealer_play()
-            self.bet_size = original_bet  # Reset bet size for next round
+        # reset bet sizes if doubled down
+        self.bet_size = self.current_bet
+        self.hide_action_buttons()
+        self.show_continue_buttons()
+        self.update_display(reveal_dealer=True, message=f"{message1}, {message2}")
 
     def dealer_play(self):
         # Dealer's turn
@@ -753,14 +948,20 @@ class BlackjackGame:
 
     def find_optimal_move(self):
 
-        if self.player_hand == []: # This only happens when the game just starts.
+        if self.is_split and self.hand_num == 2:
+            hand = self.player_hand2
+        else:
+            hand = self.player_hand
+
+
+        if hand == []: # This only happens when the game just starts.
             return ""
 
         # look at player and dealer hands, and return optimal move.
         dealer_upcard = self.dealer_hand[1]
 
-        player_cards_total = sum(self.player_hand)
-        if 11 in self.player_hand:
+        player_cards_total = sum(hand)
+        if 11 in hand:
             is_soft = True
         else:
             is_soft = False
@@ -772,6 +973,25 @@ class BlackjackGame:
             return "Surrender"
         elif (is_soft == False) and (player_cards_total == 15) and (dealer_upcard == 10) and (self.config['is_surrender']) and (self.is_drawn == False):
             return "Surrender"
+        # Double aces case
+        elif (self.config['is_split']) and (not self.is_split) and (hand.sort() == [1,11]):
+            return "Split"
+        elif (self.config['is_split']) and (not self.is_split) and (hand == [9,9]) and ((dealer_upcard <= 6) or (dealer_upcard == 8) or (dealer_upcard == 9)):
+            return "Split"
+        elif (self.config['is_split']) and (not self.is_split) and (hand == [8,8]):
+            return "Split"
+        elif (self.config['is_split']) and (not self.is_split) and (hand == [7,7]) and (dealer_upcard <= 7):
+            return "Split"
+        elif (self.config['is_split']) and (not self.is_split) and (hand == [6,6]) and (dealer_upcard <= 6) and (dealer_upcard >= 3):
+            return "Split"
+        elif (self.config['is_split']) and (not self.is_split) and (hand == [6,6]) and (dealer_upcard == 2) and (self.config["is_DAS"]):
+            return "Split"
+        elif (self.config['is_split']) and (not self.is_split) and (hand == [4,4]) and ((dealer_upcard == 5) or (dealer_upcard == 6)) and (self.config["is_DAS"]):
+            return "Split"
+        elif (self.config['is_split']) and (not self.is_split) and ((hand == [3,3]) or (hand == [2,2])) and (dealer_upcard <= 7) and (dealer_upcard >= 4):
+            return "Split"
+        elif (self.config['is_split']) and (not self.is_split) and ((hand == [3,3]) or (hand == [2,2])) and (dealer_upcard <= 3) and (self.config["is_DAS"]):
+            return "Split"
         elif (is_soft == False) and (player_cards_total == 11) and (self.config['is_double_down']) and (self.money >= 2 * self.bet_size) and (self.is_drawn == False):
             return "Double Down"
         elif (is_soft == False) and (player_cards_total == 10) and (self.config['is_double_down']) and (self.money >= 2 * self.bet_size) and (dealer_upcard <= 9) and (self.is_drawn == False):
@@ -792,6 +1012,12 @@ class BlackjackGame:
             return "Double Down"
         elif (is_soft == True) and (player_cards_total == 18) and (dealer_upcard <= 8):
             return "Stand"
+        elif (is_soft == True) and (player_cards_total == 17) and (dealer_upcard <= 6) and (dealer_upcard >= 3) and (self.config['is_double_down']) and (self.money >= 2 * self.bet_size) and (self.is_drawn == False):
+            return "Double Down"
+        elif (is_soft == True) and (player_cards_total == 16 or player_cards_total == 15) and (dealer_upcard <= 6) and (dealer_upcard >= 4) and (self.config['is_double_down']) and (self.money >= 2 * self.bet_size) and (self.is_drawn == False):
+            return "Double Down"
+        elif (is_soft == True) and (player_cards_total == 14 or player_cards_total == 13) and (dealer_upcard <= 6) and (dealer_upcard >= 5) and (self.config['is_double_down']) and (self.money >= 2 * self.bet_size) and (self.is_drawn == False):
+            return "Double Down"
         else:
             return "Hit"
 
@@ -824,10 +1050,10 @@ class BlackjackGame:
         if self.help_visible and self.count_label:
             self.count_label.config(text=f"Running Count: {self.running_count_old}")
 
-        if self.bet_size > 0:
+        if self.bet_size >= self.min_bet_size:
             self.start_game()
         else:
-            self.info_label.config(text="Enter a bet!")
+            self.info_label.config(text=f"Enter a bet! (Minimum bet: {self.min_bet_size})")
 
     def build_deck(self, pool_visual, build_size, is_balanced):
         """Builds a deck of cards based on the chosen cards and balance preference."""
@@ -935,8 +1161,6 @@ class BlackjackGame:
 
     def clear_bet(self):
         """Clear all placed chips"""
-        a = 5
-        b = 4 # for debugging.
         if self.is_round_end:  # Only allow clearing before the round starts
             self.current_bet = 0
             self.placed_chips = []
