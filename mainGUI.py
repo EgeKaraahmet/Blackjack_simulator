@@ -6,9 +6,15 @@ from PIL import Image, ImageTk
 
 # self.player turn can be removed?
 
+# Resim tam ekran olsun
+
+# split el 1 hit bust reveal dealer true. Hit hit split el 2 gene bust.
+# para bet < total money bug fix.
+
 # Hard 17 and soft 17 have different strategies!!! FIX
 
 # optional music
+# para saveleme konusu
 
 class BlackjackGame:
     def __init__(self, master):
@@ -91,7 +97,7 @@ class BlackjackGame:
 
         self.money = self.config['starting_bankroll']
         self.bet_size = 0
-        self.min_bet_size = self.config['min_bet_size']
+        self.min_bet_size = int(self.config['min_bet_size'])
         self.deck = self.data['deck'].copy()
         self.deck_visual = self.data['deck_visual'].copy()
 
@@ -213,7 +219,7 @@ class BlackjackGame:
         
     def start_game(self):
         text = "" # Reset message text
-        if self.money < 0:
+        if self.money < self.min_bet_size:
             self.info_label.config(text="You don't have enough money to continue playing. Game over.")
             self.hide_action_buttons()
             self.hide_continue_buttons()
@@ -1050,8 +1056,21 @@ class BlackjackGame:
         if self.help_visible and self.count_label:
             self.count_label.config(text=f"Running Count: {self.running_count_old}")
 
-        if self.bet_size >= self.min_bet_size:
+        if (self.bet_size >= self.min_bet_size) and (self.money >= self.bet_size):
             self.start_game()
+        elif (self.money < self.min_bet_size):
+            self.info_label.config(text="You don't have enough money to continue playing. Game over.")
+            self.hide_action_buttons()
+            self.hide_continue_buttons()
+            
+            self.player_label.pack_forget()
+            self.dealer_label.pack_forget()
+            self.player_cards_frame.pack_forget()
+            self.dealer_cards_frame.pack_forget()
+
+            self.money_label.config(text=f"Money: {self.money}")
+            self.exit_button.pack(side=tk.LEFT, padx=10)     
+            return
         else:
             self.info_label.config(text=f"Enter a bet! (Minimum bet: {self.min_bet_size})")
 
