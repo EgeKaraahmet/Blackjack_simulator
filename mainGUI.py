@@ -15,7 +15,7 @@ class BlackjackGame:
         self.master.title("Blackjack Simulator")
         self.master.geometry("300x300")
 
-         # Initialize pygame mixer
+        # Initialize pygame mixer
         pygame.mixer.init()
         self.background_music = None
 
