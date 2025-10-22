@@ -328,21 +328,27 @@ class BlackjackGame:
         if reveal_dealer:
             # Count all dealer cards if revealed
             for card in self.dealer_hand:
-                if card <= 6:
+                if card == 1: #If the card is an ace and has a value of 1, its still high card.
+                    self.running_count -= 1
+                elif card <= 6:
                     self.running_count += 1
                 elif card >= 10:
                     self.running_count -= 1
         else:
             # Count only the visible dealer card
             visible_card = self.dealer_hand[1]  # Second card is visible
-            if visible_card <= 6:
+            if visible_card == 1: #If the card is an ace and has a value of 1, its still high card.
+                self.running_count -= 1
+            elif visible_card <= 6:
                 self.running_count += 1
             elif visible_card >= 10:
                 self.running_count -= 1
 
         # Count player's cards
         for card in hand:
-            if card <= 6:
+            if card == 1: #If the card is an ace and has a value of 1, its still high card.
+                self.running_count -= 1
+            elif card <= 6:
                 self.running_count += 1
             elif card >= 10:
                 self.running_count -= 1
