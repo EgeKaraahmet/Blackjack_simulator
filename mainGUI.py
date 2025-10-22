@@ -5,9 +5,7 @@ import tkinter as tk
 from PIL import Image, ImageTk
 import pygame
 
-# Hard 17 and soft 17 have different strategies!!! FIX
-
-# money save function after exit game?
+# European rules: Dealer blackjack, unknown. Everyone loses even after hitting to a 21 if dealer has blackjack. Only player blackjack gives push.
 
 class BlackjackGame:
     def __init__(self, master):
@@ -76,6 +74,7 @@ class BlackjackGame:
         self.money = self.config['starting_bankroll']
         self.bet_size = 0
         self.min_bet_size = int(self.config['min_bet_size'])
+        self.blackjack_multiplier = self.config['blackjack_multiplier']
         self.deck = self.data['deck'].copy()
         self.deck_visual = self.data['deck_visual'].copy()
         # Initialize game components
@@ -104,11 +103,11 @@ class BlackjackGame:
         self.card_back = ImageTk.PhotoImage(Image.open("media/backs/red.png").resize((100, 145)))
 
         # Load help image - resize to fit help_frame width
-        help_img = Image.open("media/strategy/BJA_Basic_Strategy.jpg")
+        help_img = Image.open("media/strategy/BJA-Basic-Strategy.jpg")
         help_frame_width = self.help_frame.winfo_width()
         help_frame_height = self.help_frame.winfo_height()
         # Resize image to fit frame while maintaining aspect ratio
-        help_img = help_img.resize((help_frame_width - 20, int(help_frame_height * 0.7)))
+        help_img = help_img.resize((help_frame_width, int(help_frame_height - 200)))
         self.help_photo = ImageTk.PhotoImage(help_img)
 
         # GUI Elements
@@ -214,7 +213,7 @@ class BlackjackGame:
             self.exit_button.pack(side=tk.LEFT, padx=10)     
             return
 
-        if len(self.deck) < 20:
+        if len(self.deck) < (self.config['deck_pen'] * 52):
             text="Low on cards, reshuffling the deck..."
             self.deck_visual = self.data['deck_visual'].copy()
             random.shuffle(self.deck_visual)
@@ -234,6 +233,8 @@ class BlackjackGame:
         self.is_round_end = False
         self.is_split = False
         self.hand_num = 1
+        self.is_player_blackjack = False
+        self.is_dealer_blackjack = False
 
         # Deal initial cards
         for _ in range(2):
@@ -243,8 +244,15 @@ class BlackjackGame:
             self.player_hand_visual.append(self.deck_visual.pop(0))
             self.dealer_hand_visual.append(self.deck_visual.pop(0))
 
-        if sum(self.player_hand) > 21 and 11 in self.player_hand: # if both aces are drawn
+
+        if sum(self.player_hand) == 21:
+            self.is_player_blackjack = True
+        elif sum(self.player_hand) > 21 and 11 in self.player_hand: # if both aces are drawn
             self.player_hand[self.player_hand.index(11)] = 1  # Convert Ace from 11 to 1
+
+        
+        if sum(self.dealer_hand) == 21:
+            self.is_dealer_blackjack = True
 
 
         self.show_action_buttons()
@@ -366,9 +374,9 @@ class BlackjackGame:
         else:
             background_color_policy = 'white'
 
-        if self.running_count / len(self.deck) < -5: # True count
+        if self.running_count / (len(self.deck) / 52) < -2: # True count
             background_color_running_count = 'red2'
-        elif self.running_count / len(self.deck) > 10:
+        elif self.running_count / (len(self.deck) / 52) > 2:
             background_color_running_count = 'green1'
         else:
             background_color_running_count = 'white'
@@ -381,7 +389,7 @@ class BlackjackGame:
 
         self.deck_label = tk.Label(self.help_frame, 
                                 text=f"Remaining Decks: {len(self.deck) / 52:.2f}", 
-                                font=("Arial", 14, "bold"))
+                                font=("Arial", 14, "bold"), bg=background_color_running_count)
         self.deck_label.grid(row=1, pady=10, sticky='ew')
         
         self.policy_label = tk.Label(self.help_frame, 
@@ -422,9 +430,9 @@ class BlackjackGame:
     def preset_configs(self, num):
         ''' Preset configs that save when clicked in the config dialog'''
         if num == 1:
-            deck_size = 104
+            deck_size = 6
             is_balanced = True
-            pool_multiple = 4 # pool size
+            pool_multiple = 10 # pool size
             bankroll_entry = 1000
             surrender_var = True
             double_var = True
@@ -432,8 +440,10 @@ class BlackjackGame:
             soft17_var = False
             das_var = True
             minimum_bet_size = 5
+            blackjack_multiplier = 1.5
+            deck_pen = 1.5
         elif num == 2:
-            deck_size = 104
+            deck_size = 2
             is_balanced = False
             pool_multiple = 4 # pool size
             bankroll_entry = 2000
@@ -443,8 +453,10 @@ class BlackjackGame:
             soft17_var = True
             das_var = True
             minimum_bet_size = 2
+            blackjack_multiplier = 1.5
+            deck_pen = 1.5
         elif num == 3:
-            deck_size = 208
+            deck_size = 4
             is_balanced = True
             pool_multiple = 8 # pool size
             bankroll_entry = 5000
@@ -454,6 +466,8 @@ class BlackjackGame:
             soft17_var = False
             das_var = True
             minimum_bet_size = 10
+            blackjack_multiplier = 1.5
+            deck_pen = 1.5
 
         # Create deck
         suits = ['♠', '♣', '♥', '♦']
@@ -472,7 +486,9 @@ class BlackjackGame:
             'stands_soft17': soft17_var,
             'is_split': split_var,
             'is_DAS': das_var,
-            'min_bet_size': minimum_bet_size
+            'min_bet_size': minimum_bet_size,
+            'blackjack_multiplier': blackjack_multiplier,
+            'deck_pen': deck_pen
         }
 
         data_dict = {'deck': custom_deck, "deck_visual": custom_deck_visual}
@@ -489,7 +505,7 @@ class BlackjackGame:
         # Create configuration dialog
         custom_config_window = tk.Toplevel(self.master)
         custom_config_window.title("Configuration")
-        custom_config_window.geometry("500x600")
+        custom_config_window.geometry("500x700")
 
         # Bet size
         tk.Label(custom_config_window, text="Minimum bet size: ", font=("Arial", 12)).pack(pady=5)
@@ -515,6 +531,16 @@ class BlackjackGame:
         tk.Label(custom_config_window, text="Starting bankroll:", font=("Arial", 12)).pack(pady=5)
         bankroll_entry = tk.Entry(custom_config_window)
         bankroll_entry.pack(pady=5)
+
+        # Blackjack payout
+        tk.Label(custom_config_window, text="Blackjack payout", font=("Arial", 12)).pack(pady=5)
+        blackjack_multiplier_entry = tk.Entry(custom_config_window)
+        blackjack_multiplier_entry.pack(pady=5)
+
+        # Deck pen
+        tk.Label(custom_config_window, text="Deck pen", font=("Arial", 12)).pack(pady=5)
+        deck_pen_entry = tk.Entry(custom_config_window)
+        deck_pen_entry.pack(pady=5)
 
         # Surrender allowed
         surrender_var = tk.BooleanVar()
@@ -564,7 +590,9 @@ class BlackjackGame:
                 'stands_soft17': soft17_var.get(),
                 'is_split': split_var.get(),
                 'is_DAS': das_var.get(),
-                'min_bet_size': minimum_bet_size.get()
+                'min_bet_size': minimum_bet_size.get(),
+                'blackjack_multiplier': blackjack_multiplier_entry.get(),
+                'deck_pen': deck_pen_entry.get()
             }
 
             data_dict = {'deck': custom_deck, "deck_visual": custom_deck_visual}
@@ -596,7 +624,9 @@ class BlackjackGame:
             self.double_down_button.pack(side=tk.LEFT, padx=(10,0))
 
         # Show split if card is not drawn, not already split before, and have same cards.
-        if (self.player_hand[0] == self.player_hand[1]) and (not self.is_drawn) and (not self.is_split):
+        if (self.config['is_split']) and (self.player_hand[0] == self.player_hand[1]) and (not self.is_drawn) and (not self.is_split):
+            self.split_button.pack(side=tk.LEFT, padx=(10,0))
+        elif (self.config['is_split']) and (not self.is_split) and (not self.is_drawn) and (self.player_hand[0] == 1 and self.player_hand[1] == 11 or self.player_hand[0] == 11 and self.player_hand[1] == 1):
             self.split_button.pack(side=tk.LEFT, padx=(10,0))
 
     def hide_action_buttons(self):
@@ -741,8 +771,11 @@ class BlackjackGame:
         # Non split hands        
         else:
             self.hide_action_buttons()
-            self.dealer_play()
-            self.resolve_round()
+            if self.is_player_blackjack:
+                self.resolve_round()
+            else:
+                self.dealer_play()
+                self.resolve_round()
 
     def surrender(self):
         """Player surrenders and loses half the bet."""
@@ -766,7 +799,7 @@ class BlackjackGame:
                     self.player_hand[self.player_hand.index(11)] = 1  # Convert Ace from 11 to 1
 
                 self.hand_num = 2
-                self.update_display(reveal_dealer=True, message="Hand 2")
+                self.update_display(reveal_dealer=False, message="Hand 2")
 
             else:
                 self.bet_size2 *= 2  # Double the bet size
@@ -810,8 +843,15 @@ class BlackjackGame:
         self.player_hand_visual.append(self.deck_visual.pop(0))
         self.player_hand2.append(self.deck.pop(0))
         self.player_hand_visual2.append(self.deck_visual.pop(0))
+
+
+        if sum(self.player_hand) > 21 and 11 in self.player_hand: # if both aces are drawn
+            self.player_hand[self.player_hand.index(11)] = 1  # Convert Ace from 11 to 1
+    
+        if sum(self.player_hand2) > 21 and 11 in self.player_hand2: # if both aces are drawn
+            self.player_hand2[self.player_hand2.index(11)] = 1  # Convert Ace from 11 to 1
         
-        # Double the bet for second hand
+        # Bet for second hand
         self.bet_size2 = self.bet_size
         
         # Update display for first hand
@@ -833,7 +873,10 @@ class BlackjackGame:
             self.dealer_play()
             dealer_total = sum(self.dealer_hand)
 
-        # Resolve first hand
+        # If dealer has blackjack, you lose either way.
+        if self.is_dealer_blackjack:
+            message1 = "Hand 1: You lose (Dealer blackjack)"
+            self.money -= self.bet_size
         if hand1_total > 21:
             self.money -= self.bet_size
             message1 = "Hand 1: Bust"
@@ -849,7 +892,9 @@ class BlackjackGame:
         else:
             message1 = "Hand 1: Push"
 
-        # Resolve second hand
+        if self.is_dealer_blackjack:
+            message1 = "Hand 2: You lose (Dealer blackjack)"
+            self.money -= self.bet_size
         if hand2_total > 21:
             self.money -= self.bet_size2
             message2 = "Hand 2: Bust"
@@ -922,7 +967,7 @@ class BlackjackGame:
         elif (is_soft == False) and (player_cards_total == 15) and (dealer_upcard == 10) and (self.config['is_surrender']) and (self.is_drawn == False):
             return "Surrender"
         # Double aces case
-        elif (self.config['is_split']) and (not self.is_split) and (hand.sort() == [1,11]):
+        elif (self.config['is_split']) and (not self.is_split) and ((hand == [1,11]) or (hand == [11,1])):
             return "Split"
         elif (self.config['is_split']) and (not self.is_split) and (hand == [9,9]) and ((dealer_upcard <= 6) or (dealer_upcard == 8) or (dealer_upcard == 9)):
             return "Split"
@@ -974,7 +1019,16 @@ class BlackjackGame:
         dealer_total = sum(self.dealer_hand)
         message = ""
 
-        if dealer_total > 21:
+        # First checks blackjack cases.
+        if self.is_player_blackjack and self.is_dealer_blackjack:
+            message = "Push. No one wins."
+        elif self.is_player_blackjack:
+            message = "You win! (Blackjack)"
+            self.money += self.bet_size * self.blackjack_multiplier
+        elif self.is_dealer_blackjack:
+            message = "You lose! (Dealer Blackjack)"
+            self.money -= self.bet_size
+        elif dealer_total > 21:
             message = "Dealer busts. You win!"
             self.money += self.bet_size
         elif dealer_total > player_total:
@@ -1019,15 +1073,15 @@ class BlackjackGame:
 
     def build_deck(self, pool_visual, build_size, is_balanced):
         """Builds a deck of cards based on the chosen cards and balance preference."""
-        custom_deck = [0] * build_size # Initialize empty deck
-        custom_deck_visual = [0] * build_size # Initialize empty deck for visual representation
+        custom_deck = [0] * int(build_size * 52) # Initialize empty deck
+        custom_deck_visual = [0] * int(build_size * 52) # Initialize empty deck for visual representation
 
         pool = self.from_visual_to_logic(pool_visual)
 
         if is_balanced:
-            remaining_empty_slots = build_size # Total slots in the custom deck which is empty
+            remaining_empty_slots = int(build_size * 52) # Total slots in the custom deck which is empty
             running_count = 0
-            for i in range(build_size):
+            for i in range(int(build_size * 52)):
                 random_index = random.randint(0, len(pool)-1)
                 custom_deck[i] = pool[random_index]
                 custom_deck_visual[i] = pool_visual[random_index]
@@ -1063,7 +1117,7 @@ class BlackjackGame:
                     break
 
             if running_count < 0: # More high cards drawn
-                for j in range(i_note, build_size):
+                for j in range(i_note, int(build_size * 52)):
                     random_index = random.randint(0, len(pool)-1)
                     while pool[random_index] >= 7: # Avoid high and neutral cards
                         pool.pop(random_index) # Remove unwanted cards to reduce pool size for performance
@@ -1074,7 +1128,7 @@ class BlackjackGame:
                     pool.pop(random_index)  # Remove to avoid duplicates
                     pool_visual.pop(random_index)
             elif running_count > 0:
-                for j in range(i_note, build_size):
+                for j in range(i_note, int(build_size * 52)):
                     random_index = random.randint(0, len(pool)-1)
                     while pool[random_index] <= 9: # Avoid low and neutral cards
                         pool.pop(random_index) # Remove unwanted cards to reduce pool size for performance
@@ -1090,7 +1144,7 @@ class BlackjackGame:
             custom_deck = self.from_visual_to_logic(custom_deck_visual)
 
         else:
-            for i in range(build_size):
+            for i in range(int(build_size * 52)):
                 random_index = random.randint(0, len(pool)-1)
                 custom_deck[i] = pool[random_index]
                 custom_deck_visual[i] = pool_visual[random_index]
